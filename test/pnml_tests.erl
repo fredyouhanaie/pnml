@@ -41,3 +41,26 @@ read_sample_1_test_() ->
       {"small file",
        ?_assertMatch({ok, null}, pnml:read(?Model_small))}
      ]}.
+
+%%--------------------------------------------------------------------
+
+-define(Counter, {fun pnml:h_count/2, #{}}).
+
+-define(Counts_tiny, #{arc => 1, initialMarking => 1, inscription => 1,
+                       name => 1, net => 1, page => 1, place => 1,
+                       pnml => 1, text => 3, transition => 1} ).
+
+-define(Counts_small, #{arc => 440, graphics => 204, initialMarking => 12,
+                        inscription => 80, name => 98, net => 1, offset => 108,
+                        page => 1, place => 24, pnml => 1, position => 96,
+                        text => 190, transition => 72 } ).
+
+read_counter_1_test_() ->
+    {setup, fun setup/0, fun cleanup/1,
+     [{"no file",
+       ?_assertMatch({error, _Reason}, pnml:read(?Model_nofile, ?Counter))},
+      {"tiny file",
+       ?_assertEqual({ok, ?Counts_tiny}, pnml:read(?Model_tiny, ?Counter))},
+      {"small file",
+       ?_assertEqual({ok, ?Counts_small}, pnml:read(?Model_small, ?Counter))}
+     ]}.

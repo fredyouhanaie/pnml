@@ -14,6 +14,7 @@
 
 -export([read/1, read/2]).
 -export([h_null/2]).
+-export([h_count/2]).
 
 -include_lib("xmerl/include/xmerl.hrl").
 -include_lib("kernel/include/logger.hrl").
@@ -139,3 +140,33 @@ call_handler(Arg, State) ->
 -spec h_null(tuple(), term()) -> term().
 h_null(_, State) ->
     State.
+
+
+%%--------------------------------------------------------------------
+%% @doc Handler that counts the tags.
+%%
+%% Each `el_begin' call increments the count for the corresponding
+%% `Tag'. Everything else, such as attributes, end tags and text are
+%% ignored.
+%%
+%% The state variable for this handler should be a `map'. When calling
+%% `read/2', it is recommended to supply an empty map as the initial
+%% value, i.e. `#{}', although a map with preset values will not be
+%% rejected. If a key for the `Tag' does not exist a new entry will be
+%% created. If a non-numeric entry exists for the `Tag', the increment
+%% operation will cause an exception!
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec h_count({el_begin, atom(), [tuple()]} | {el_end, atom()} | {el_text, string()},
+              map()) -> map().
+h_count({el_begin, Tag, _Attr}, Counts) ->
+    ?LOG_INFO("Counts=~p.", [Counts]),
+    C = maps:get(Tag, Counts, 0),
+    maps:put(Tag, C+1, Counts);
+
+h_count({el_end, _Tag}, Counts) ->
+    Counts;
+
+h_count({el_text, _Text}, Counts) ->
+    Counts.
