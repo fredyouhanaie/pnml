@@ -14,6 +14,7 @@
 
 -export([read/1, read/2]).
 -export([h_null/2, h_count/2, h_log/2]).
+-export([attr_map/1]).
 
 -include_lib("xmerl/include/xmerl.hrl").
 -include_lib("kernel/include/logger.hrl").
@@ -198,3 +199,21 @@ h_log({el_text, Text}, State) ->
     Level = maps:get(log_level, State, notice),
     ?LOG(Level, "h_log:T: Text=~p.", [Text]),
     maps:put(log_level, Level, State).
+
+
+%%--------------------------------------------------------------------
+%% @doc Return a map corresponding to the list of attributes from
+%% xmerl.
+%%
+%% We extract the attribute names and values, and ignore the rest.
+%%
+%% The attribute names are returned as atoms and the values as
+%% strings.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec attr_map(list()) -> map().
+attr_map(Attr) ->
+    Attr_to_pair = fun ({_, _, Name, Val}) -> {list_to_atom(Name), Val} end,
+    Attr_list = lists:map(Attr_to_pair, Attr),
+    maps:from_list(Attr_list).

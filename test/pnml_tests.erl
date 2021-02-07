@@ -78,3 +78,34 @@ read_logger_1_test_() ->
       {"small file",
        ?_assertEqual({ok, #{log_level=>notice}}, pnml:read(?Model_small, ?Logger))}
      ]}.
+
+%%--------------------------------------------------------------------
+
+-define(Attr_1_list, [{[], [], "id", "place_1"}]).
+-define(Attr_1_map, #{id => "place_1"}).
+
+-define(Attr_2_list, [{[],[],"type","http://www.pnml.org/version-2009/grammar/ptnet"},
+                      {[],[],"id","net_1"}]).
+-define(Attr_2_map, #{type => "http://www.pnml.org/version-2009/grammar/ptnet",
+                      id => "net_1"}).
+
+-define(Attr_3_list, [{[],[],"id","arc_1"},
+                      {[],[],"source","place_1"},
+                      {[],[],"target","transition_1"}]).
+-define(Attr_3_map, #{id => "arc_1",
+                      source => "place_1",
+                      target => "transition_1"}).
+
+map_attr_1_test_() ->
+    {setup, fun setup/0, fun cleanup/1,
+     [{"empty list",
+       ?_assertEqual(#{}, pnml:attr_map([]))},
+      {"list with 1 attribute",
+       ?_assertEqual(?Attr_1_map, pnml:attr_map(?Attr_1_list))},
+      {"list with 2 attributes",
+       ?_assertEqual(?Attr_2_map, pnml:attr_map(?Attr_2_list))},
+      {"list with 3 attributes",
+       ?_assertEqual(?Attr_3_map, pnml:attr_map(?Attr_3_list))}
+     ]}.
+
+%%--------------------------------------------------------------------
