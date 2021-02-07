@@ -13,8 +13,7 @@
 -module(pnml).
 
 -export([read/1, read/2]).
--export([h_null/2]).
--export([h_count/2]).
+-export([h_null/2, h_count/2, h_log/2]).
 
 -include_lib("xmerl/include/xmerl.hrl").
 -include_lib("kernel/include/logger.hrl").
@@ -170,3 +169,32 @@ h_count({el_end, _Tag}, Counts) ->
 
 h_count({el_text, _Text}, Counts) ->
     Counts.
+
+
+%%--------------------------------------------------------------------
+%% @doc Handler that logs the elements.
+%%
+%% The details of the element will be sent to the logger.
+%%
+%% The handler state variable should be a map. If it contains the key
+%% `log_level', then that key will be used for the logging. Otherwise,
+%% the logging will be at `notice' level.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec h_log({el_begin, atom(), [tuple()]} | {el_end, atom()} | {el_text, string()},
+              map()) -> map().
+h_log({el_begin, Tag, Attr}, State) ->
+    Level = maps:get(log_level, State, notice),
+    ?LOG(Level, "h_log:S: Tag=~p, Attr=~p.", [Tag, attr_map(Attr)]),
+    maps:put(log_level, Level, State);
+
+h_log({el_end, Tag}, State) ->
+    Level = maps:get(log_level, State, notice),
+    ?LOG(Level, "h_log:E: Tag=~p.", [Tag]),
+    maps:put(log_level, Level, State);
+
+h_log({el_text, Text}, State) ->
+    Level = maps:get(log_level, State, notice),
+    ?LOG(Level, "h_log:T: Text=~p.", [Text]),
+    maps:put(log_level, Level, State).

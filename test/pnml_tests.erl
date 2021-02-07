@@ -64,3 +64,17 @@ read_counter_1_test_() ->
       {"small file",
        ?_assertEqual({ok, ?Counts_small}, pnml:read(?Model_small, ?Counter))}
      ]}.
+
+%%--------------------------------------------------------------------
+
+-define(Logger, {fun pnml:h_log/2, #{}}).
+
+read_logger_1_test_() ->
+    {setup, fun setup/0, fun cleanup/1,
+     [{"no file",
+       ?_assertMatch({error, _Reason}, pnml:read(?Model_nofile, ?Logger))},
+      {"tiny file",
+       ?_assertEqual({ok, #{log_level=>notice}}, pnml:read(?Model_tiny, ?Logger))},
+      {"small file",
+       ?_assertEqual({ok, #{log_level=>notice}}, pnml:read(?Model_small, ?Logger))}
+     ]}.
