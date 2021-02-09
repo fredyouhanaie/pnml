@@ -25,6 +25,12 @@
 -record(state, {handler_fun, handler_state}).
 
 %%--------------------------------------------------------------------
+
+-type handler_arg() :: {el_begin, atom(), [tuple()]} |
+                       {el_end, atom()} |
+                       {el_text, string()}.
+
+%%--------------------------------------------------------------------
 %% @doc read in an XML file with the default handler.
 %%
 %% See `read/2' for further details.
@@ -121,7 +127,7 @@ event_cb(Event, _Loc, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec call_handler(term(), term()) -> term().
+-spec call_handler(handler_arg(), term()) -> term().
 call_handler(Arg, State) ->
     H_fun = State#state.handler_fun,
     S_cur = State#state.handler_state,
@@ -137,7 +143,7 @@ call_handler(Arg, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec h_null(tuple(), term()) -> term().
+-spec h_null(handler_arg(), term()) -> term().
 h_null(_, State) ->
     State.
 
@@ -158,8 +164,7 @@ h_null(_, State) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec h_count({el_begin, atom(), [tuple()]} | {el_end, atom()} | {el_text, string()},
-              map()) -> map().
+-spec h_count(handler_arg(), map()) -> map().
 h_count({el_begin, Tag, _Attr}, Counts) ->
     ?LOG_INFO("Counts=~p.", [Counts]),
     C = maps:get(Tag, Counts, 0),
@@ -183,8 +188,7 @@ h_count({el_text, _Text}, Counts) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec h_log({el_begin, atom(), [tuple()]} | {el_end, atom()} | {el_text, string()},
-              map()) -> map().
+-spec h_log(handler_arg(), map()) -> map().
 h_log({el_begin, Tag, Attr}, State) ->
     Level = maps:get(log_level, State, notice),
     ?LOG(Level, "h_log:S: Tag=~p, Attr=~p.", [Tag, attr_map(Attr)]),
