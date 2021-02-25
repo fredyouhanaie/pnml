@@ -5,36 +5,60 @@
 %%%
 %%% A handler that saves the net elements in an ETS table.
 %%%
-%%% The ETS table will contain one record for each of PNML elements in
-%%% the document, i.e. `net', `place', `transition' and `arc'.
+%%% Two ETS tables will be created, one for the Petri Net elements,
+%%% and the second for the net element names.
 %%%
-%%% Each of the Net elements have a unique string identifier, however,
+%%% The table for the net elements will contain one record for each of
+%%% PNML elements in the document, i.e. `net', `place', `transition'
+%%% and `arc'.
+%%%
+%%% The terms stored in the ETS table are of the following types:
+%%%
+%%% <ul>
+%%%
+%%% <li>`{ {net, Num_id}, #{type => Net_type} }'</li>
+%%%
+%%% <li>`{ {place, Num_id}, #{net_num => Net_num, initial_marking => Initial_Marking} }'</li>
+%%%
+%%% <li>`{ {transition, Num_id}, #{net_num => Net_num, } }'</li>
+%%%
+%%% <li>`{ {arc, Num_id}, #{net_num => Net_num, source => Source, target => Target, inscription => Inscription} }'</li>
+%%%
+%%% </ul>
+%%%
+%%% Where:
+%%%
+%%% <ul>
+%%%
+%%% <li>`Num_id' is the unique numeric id assigned to each
+%%% element.</li>
+%%%
+%%% <li>`InitMarking' and `Inscription' are integers that are either
+%%% taken from the PNML document, or if missing are assigned default
+%%% values of `0' and `1' respectively.</li>
+%%%
+%%% <li>`Source' and `Target' are the unique numbers assigned to their
+%%% corresponding `place' or `transition' string identifiers.</li>
+%%%
+%%% </ul>
+%%%
+%%% Each of the Net elements has a unique string identifier, however,
 %%% in the interest of efficiency, we maintain a symbol table,
 %%% `Names', that maps the symbolic names (as binary strings) to
-%%% unique numeric ids. The `Names' map is part of the handler state,
-%%% and is returned when `pnml:read/2' completes successfully. The
-%%% records in the ETS table will contain the numeric ids.
+%%% unique numeric ids. The `Names' table will contain one tuple for
+%%% each net element name/number pair, `{Id::binary(),
+%%% Id_num::integer()}'.
 %%%
-%%% This handler can be used as follows:
-%%%
-%%% <code>
-%%% Tab_id = ets:new(Tab_name, Tab_opts),<br/>
-%%% State0 = {fun pnml_ets:h_ets/2, {[], {#{}, 0}, Tab_id}},<br/>
-%%% {ok, {[], {Names, Count}, Tab_id} = pnml:read(File, State0)
-%%% </code>
-%%%
-%%% Where `Names' is a map of binary strings to unique numeric
-%%% identifiers and `Count' is the number of entries in `Names'.
-%%%
-%%% If successful, the ETS table will contain one record for each Net
-%%% element.
+%%% The two tables are created by the `read_pt/1' function, and the
+%%% table ids returned as part of the result, if the function is
+%%% successful.
 %%%
 %%% @end
 %%% Created :  7 Feb 2021 by Fred Youhanaie <fyrlang@anydata.co.uk>
 %%%-------------------------------------------------------------------
 -module(pnml_ets).
 
--export([h_ets/2]).
+-export([read_pt/1, get_id_num/2, add_id_ref/3]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -48,46 +72,46 @@
 
 %%-------------------------------------------------------------------
 
--type h_ets_state() :: {list(), {map(), integer()}, ets:tid()}.
+-type h_ets_state() :: {Parents::list(), Names_tabid::ets:tid(), Net_tabid::ets:tid()}.
+
+%%--------------------------------------------------------------------
+%% @doc Read a PT net and store the details in ETS tables.
+%%
+%% We create two tables one for the net elements, and the other for
+%% the element names and their corresponding unique numbers.
+%%
+%% Whether succussful, otherwise, the ETS table identifiers are
+%% returned to the caller.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec read_pt(string()) -> {ok, ets:tid(), ets:tid()} | {{error, term()}, ets:tid(), ets:tid()}.
+read_pt(File) ->
+    Base_name = atom_to_list(?MODULE),
+
+    Net_table = list_to_atom(Base_name ++ "_net"),
+    Net_tabid = ets:new(Net_table, []),
+
+    Names_table = list_to_atom(Base_name ++ "_names"),
+    Names_tabid = ets:new(Names_table, []),
+
+    State0 = {fun h_ets/2, {[], Names_tabid, Net_tabid}},
+    case pnml:read(File, State0) of
+        {ok, {[], Names_tabid, Net_tabid}} ->
+            {ok, Names_tabid, Net_tabid};
+        Other ->
+            {Other, Names_tabid, Net_tabid}
+    end.
+
 
 %%--------------------------------------------------------------------
 %% @doc The main handler function.
 %%
 %% The handler state is a tuple `{Parents, Names, Tab_id}', where,
 %% `Parents' is a list, initially empty, that keeps track of the
-%% nested elements; `Names' is a tuple, `{Map, Next_num}', initially
-%% `{#{}, 0}', is a symbol table for the element ids; and `Tab_id' is
-%% the ETS table id.
+%% nested elements; `Names' is the ETS table id of the name/num pairs;
+%% and `Tab_id' is the ETS table id of the net elements.
 %%
-%% The terms stored in the ETS table are of the following types:
-%%
-%% <ul>
-%%
-%% <li>`{ {net, Num_id}, #{type => Net_type} }'</li>
-%%
-%% <li>`{ {place, Num_id}, #{net_num => Net_num, initial_marking => Initial_Marking} }'</li>
-%%
-%% <li>`{ {transition, Num_id}, #{net_num => Net_num, } }'</li>
-%%
-%% <li>`{ {arc, Num_id}, #{net_num => Net_num, source => Source, target => Target, inscription => Inscription} }'</li>
-%%
-%% </ul>
-%%
-%% Where:
-%%
-%% <ul>
-%%
-%% <li>`Num_id' is the unique numeric id assigned to each
-%% element.</li>
-%%
-%% <li>`InitMarking' and `Inscription' are integers that are either
-%% taken from the PNML document, or if missing are assigned default
-%% values of `0' and `1' respectively.</li>
-%%
-%% <li>`Source' and `Target' are the unique numbers assigned to their
-%% corresponding `place' or `transition' string identifiers.</li>
-%%
-%% </ul>
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -136,30 +160,30 @@ h_ets_begin(pnml, _Attr_map, {[], Names, Tab_id}) ->
     {[pnml], Names, Tab_id};
 
 h_ets_begin(net, Attr_map, {[pnml], Names, Tab_id}) ->
-    {Id_num, Names2} = get_id_num(maps:get(id, Attr_map), Names),
+    Id_num = get_id_num(maps:get(id, Attr_map), Names),
     Type = list_to_binary(maps:get(type, Attr_map)),
     true = ets:insert(Tab_id, {{net, Id_num}, #{type => Type} }),
-    {[{net, Id_num}, pnml], Names2, Tab_id};
+    {[{net, Id_num}, pnml], Names, Tab_id};
 
 h_ets_begin(place, Attr_map, {Parents=[{net, Net_num}, pnml], Names, Tab_id}) ->
-    {Id_num, Names2} = get_id_num(maps:get(id, Attr_map), Names),
+    Id_num = get_id_num(maps:get(id, Attr_map), Names),
     true = ets:insert(Tab_id, {{place, Id_num},
                                #{net_num=>Net_num,
                                  initial_marking=>0}
                               }),
-    {[{place, Id_num}|Parents], Names2, Tab_id};
+    {[{place, Id_num}|Parents], Names, Tab_id};
 
 h_ets_begin(transition, Attr_map, {Parents=[{net, Net_num}, pnml], Names, Tab_id}) ->
-    {Id_num, Names2} = get_id_num(maps:get(id, Attr_map), Names),
+    Id_num = get_id_num(maps:get(id, Attr_map), Names),
     true = ets:insert(Tab_id, {{transition, Id_num},
                                #{net_num=>Net_num}
                               }),
-    {[{transition, Id_num}|Parents], Names2, Tab_id};
+    {[{transition, Id_num}|Parents], Names, Tab_id};
 
 h_ets_begin(arc, Attr_map, {Parents=[{net, Net_num}, pnml], Names, Tab_id}) ->
-    {Id_num, Names2}     = get_id_num(maps:get(id, Attr_map), Names),
-    {Source_num, Names3} = get_id_num(maps:get(source, Attr_map), Names2),
-    {Target_num, Names4} = get_id_num(maps:get(target, Attr_map), Names3),
+    Id_num     = get_id_num(maps:get(id, Attr_map), Names),
+    Source_num = get_id_num(maps:get(source, Attr_map), Names),
+    Target_num = get_id_num(maps:get(target, Attr_map), Names),
 
     true = ets:insert(Tab_id, {{arc, Id_num},
                                #{net_num => Net_num,
@@ -167,19 +191,19 @@ h_ets_begin(arc, Attr_map, {Parents=[{net, Net_num}, pnml], Names, Tab_id}) ->
                                  target => Target_num,
                                  inscription => 1}
                               }),
-    {[{arc, Id_num}|Parents], Names4, Tab_id};
+    {[{arc, Id_num}|Parents], Names, Tab_id};
 
 h_ets_begin(referencePlace, Attr_map, {Parents=[{net, _Net_num}, pnml], Names, Tab_id}) ->
-    Names2 = add_id_ref(maps:get(id, Attr_map),
-                                 maps:get(ref, Attr_map),
-                                 Names),
-    {[referencePlace|Parents], Names2, Tab_id};
+    add_id_ref(maps:get(id, Attr_map),
+               maps:get(ref, Attr_map),
+               Names),
+    {[referencePlace|Parents], Names, Tab_id};
 
 h_ets_begin(referenceTransition, Attr_map, {Parents=[{net, _Net_num}, pnml], Names, Tab_id}) ->
-    Names2 = add_id_ref(maps:get(id, Attr_map),
-                                 maps:get(ref, Attr_map),
-                                 Names),
-    {[referenceTransition|Parents], Names2, Tab_id};
+    add_id_ref(maps:get(id, Attr_map),
+               maps:get(ref, Attr_map),
+               Names),
+    {[referenceTransition|Parents], Names, Tab_id};
 
 h_ets_begin(Tag, _Attr_map, {Parents, Names, Tab_id}) ->
     ?LOG_DEBUG("h_ets_begin: tag ignored Tag=~p, Parents=~p.", [Tag, Parents]),
@@ -279,42 +303,55 @@ add_id_ref(Id, Ref, {Map, Next_num}) ->
 %% @doc Return the id number for a given PNML element id name.
 %%
 %% If the name does not exist, a new entry with a new unique number is
-%% created. The number and the updated map is then returned.
+%% created, and inserted in the ETS table for the names.
 %%
 %% If the `Id' exists it may refer to a number or another name, for
 %% `referencePlace' and `referenceTransition'. In the latter case the
 %% lookup is repeated once more.
 %%
-%% The unique integer corresponding to the id name, along with the
-%% existing map is returned.
+%% The unique integer corresponding to the id name is returned.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_id_num(string(), {map(), integer()}) -> {integer(), {map(), integer()}}.
-get_id_num(Id, {Map, Next_num}) ->
+-spec get_id_num(string(), ets:tid()) -> integer().
+get_id_num(Id, Names_tid) ->
     Id_bin = list_to_binary(Id),
-    case maps:find(Id_bin, Map) of
-        {ok, Num} when is_integer(Num) -> %% we have an integer entry
-            %% We found a number entry
-            {Num, {Map, Next_num}};
+    case ets:lookup(Names_tid, Id_bin) of
+        [] -> %% entry not found
+            %% create a num entry for the Id
+            Id_num = next_num(Names_tid),
+            ets:insert(Names_tid, {Id_bin, Id_num}),
+            Id_num;
 
-        {ok, Ref} -> %% we have a reference entry
+        [{Id_bin, Id_num}] when is_integer(Id_num) -> %% we have an integer entry
+            %% We found a number entry
+            Id_num;
+
+        [{Id_bin, Ref}] -> %% we have a reference entry
             %% we found a ref entry
             %% look up the new ref
-            case maps:find(Ref, Map) of
-                {ok, Num} -> %% the second entry exists
-                    %% we found an entry (we expect integer!)
-                    {Num, {Map, Next_num}};
-                error -> %% the second entry does not exist
-                    %% create a num entry for the second Id
-                    {Next_num,
-                     {maps:put(Id_bin, Next_num, Map), Next_num+1}
-                    }
-            end;
+            case ets:lookup(Names_tid, Ref) of
+                [] -> %% entry not found
+                    %% create a num entry for the Id
+                    Id_num = next_num(Names_tid),
+                    ets:insert(Names_tid, {Ref, Id_num}),
+                    Id_num;
 
-        error -> %% entry not found
-            %% create a num entry for the Id
-            {Next_num,
-             {maps:put(Id_bin, Next_num, Map), Next_num+1}
-            }
+                [{Id_bin, Id_num}] -> %% We found a number entry
+                    Id_num
+            end
     end.
+
+
+%%--------------------------------------------------------------------
+%% @doc Increment the name index tuple, create it if missing.
+%%
+%% We maintain a `{last_num, integer()}' tuple in the ETS table for
+%% names/numbers. `last_num' is initialized to zero during the first
+%% attempt at incrementing it, and is incremented during each call.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec next_num(ets:tid()) -> integer().
+next_num(Tab_id) ->
+    ets:update_counter(Tab_id, last_num, 1, {last_num, 0}).

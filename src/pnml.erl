@@ -61,7 +61,7 @@ read(Filename) ->
 %%--------------------------------------------------------------------
 -spec read(string(),
               {fun((tuple(), term())->term()), term()}) ->
-          ok | {error, term()}.
+          {ok, term()} | {error, term()}.
 read(Filename, {Handler_fun, Handler_state}) ->
     ?LOG_INFO("read: scan started File=~p.", [Filename]),
 
