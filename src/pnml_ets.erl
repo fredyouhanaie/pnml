@@ -73,7 +73,10 @@
 
 %%-------------------------------------------------------------------
 
--type h_ets_state() :: {Parents::list(), Net_num::integer(), Place_num::integer(), Arc_num::integer()}.
+-type h_ets_state() :: {Parents::list(),
+                        Net_num::integer(),
+                        Place_num::integer(),
+                        Arc_num::integer()}.
 
 -type ref_type() :: referencePlace | referenceTransition.
 
@@ -88,7 +91,11 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec read_pt(string()) -> {ok, ets:tid(), ets:tid()} | {{error, term()}, ets:tid(), ets:tid()}.
+-spec read_pt(string()) ->
+          {ok, ets:tid(), ets:tid()} |
+          {{ok, term}, ets:tid(), ets:tid()} |
+          {{error, term}, ets:tid(), ets:tid()}.
+
 read_pt(File) ->
     Base_name = atom_to_list(?MODULE),
 
@@ -471,7 +478,7 @@ get_id_num(Id) ->
             ets:insert(Names_tid, {Id_bin, Id_num}),
             Id_num;
 
-        [{Id_bin, Id_num}] when is_integer(Id_num) -> %% we have an integer entry
+        [{Id_bin, Id_num}] when is_integer(Id_num) ->
             %% We found a number entry
             Id_num;
 
@@ -485,7 +492,8 @@ get_id_num(Id) ->
                     ets:insert(Names_tid, {Ref, Id_num}),
                     Id_num;
 
-                [{Id_bin, Id_num}] -> %% We found a number entry
+                [{Id_bin, Id_num}] ->
+                    %% We found a number entry
                     Id_num
             end
     end.
@@ -568,7 +576,8 @@ delete_table(Tab_id) ->
         true ->
             ok
     catch Type:Exception ->
-            ?LOG_WARNING("delete_table: got exception ~p:~p, Tab_id=~p.", [Type, Exception, Tab_id]),
+            ?LOG_WARNING("delete_table: got exception ~p:~p, Tab_id=~p.",
+                         [Type, Exception, Tab_id]),
             ok
     end.
 
