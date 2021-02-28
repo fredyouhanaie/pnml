@@ -29,6 +29,7 @@ setup() ->
     logger:set_primary_config(level, ?Log_level).
 
 cleanup(_) ->
+    pnml_ets:cleanup(),
     ok.
 
 %%--------------------------------------------------------------------

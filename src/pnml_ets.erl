@@ -12,7 +12,7 @@
 %%% PNML elements in the document, i.e. `net', `place', `transition'
 %%% and `arc'.
 %%%
-%%% The terms stored in the ETS table are of the following types:
+%%% The records stored in the ETS table are of one of the following forms:
 %%%
 %%% <ul>
 %%%
@@ -58,7 +58,8 @@
 %%%-------------------------------------------------------------------
 -module(pnml_ets).
 
--export([read_pt/1, get_id_num/2, add_id_ref/3]).
+-export([read_pt/1, cleanup/0]).
+-export([get_id_num/1, add_id_ref/2]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -72,7 +73,9 @@
 
 %%-------------------------------------------------------------------
 
--type h_ets_state() :: {Parents::list(), Names_tabid::ets:tid(), Net_tabid::ets:tid()}.
+-type h_ets_state() :: {Parents::list(), Net_num::integer(), Place_num::integer(), Arc_num::integer()}.
+
+-type ref_type() :: referencePlace | referenceTransition.
 
 %%--------------------------------------------------------------------
 %% @doc Read a PT net and store the details in ETS tables.
@@ -91,13 +94,15 @@ read_pt(File) ->
 
     Net_table = list_to_atom(Base_name ++ "_net"),
     Net_tabid = ets:new(Net_table, []),
+    persistent_term:put({?MODULE, net_tid}, Net_tabid),
 
     Names_table = list_to_atom(Base_name ++ "_names"),
     Names_tabid = ets:new(Names_table, []),
+    persistent_term:put({?MODULE, names_tid}, Names_tabid),
 
-    State0 = {fun h_ets/2, {[], Names_tabid, Net_tabid}},
-    case pnml:read(File, State0) of
-        {ok, {[], Names_tabid, Net_tabid}} ->
+    State0 = {[], 0, 0, 0},
+    case pnml:read(File, {fun h_ets/2, State0}) of
+        {ok, State0} ->
             {ok, Names_tabid, Net_tabid};
         Other ->
             {Other, Names_tabid, Net_tabid}
@@ -107,11 +112,21 @@ read_pt(File) ->
 %%--------------------------------------------------------------------
 %% @doc The main handler function.
 %%
-%% The handler state is a tuple `{Parents, Names, Tab_id}', where,
-%% `Parents' is a list, initially empty, that keeps track of the
-%% nested elements; `Names' is the ETS table id of the name/num pairs;
-%% and `Tab_id' is the ETS table id of the net elements.
+%% The handler state is a tuple `{Parents, Net_num, Place_num, Arc_num}',
+%% where, `Parents' is a list, initially empty, that keeps
+%% track of the nested elements.
 %%
+%% `Net_num' is the integer corresponding to the current net. This
+%% number will be recorded with each of the other elements, since a
+%% PNML document may contain more than one net.
+%%
+%% `Place_num' and `Arc_num' will either be zero, or they will hold
+%% the current place/arc number. This is used for any nested elements
+%% with paths `place'/`initialMarking'/`text' or
+%% `arc'/`inscription'/`text' that may be encountered. They are used
+%% by the `process_initialMarking/2' and `process_inscription/2'
+%% functions to update the corresponding fields in the `place' or
+%% `arc' records.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -144,107 +159,137 @@ h_ets({el_text, Text}, State) ->
 
 
 %%--------------------------------------------------------------------
-%% @doc Handle an `el_begin' requests.
+%% @doc Handle an `el_begin' request.
 %%
 %% The first parameter is the PNML element tag. Each tag is inserted
 %% at the head of the `Parents' list. Which will later be removed in
 %% the corresponding `h_ets_end' function.
 %%
-%% For the main elements we create an entry in the ETS table. You can
-%% find further details in the docs for `h_ets/2'.
+%% For the main elements we create an entry in the ETS net table.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec h_ets_begin(atom(), map(), h_ets_state()) -> h_ets_state().
-h_ets_begin(pnml, _Attr_map, {[], Names, Tab_id}) ->
-    {[pnml], Names, Tab_id};
+h_ets_begin(pnml, _Attr_map, {[], 0, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: pnml, Parents=[]."),
+    {[pnml], 0, 0, 0};
 
-h_ets_begin(net, Attr_map, {[pnml], Names, Tab_id}) ->
-    Id_num = get_id_num(maps:get(id, Attr_map), Names),
-    Type = list_to_binary(maps:get(type, Attr_map)),
-    true = ets:insert(Tab_id, {{net, Id_num}, #{type => Type} }),
-    {[{net, Id_num}, pnml], Names, Tab_id};
+h_ets_begin(net, Attr_map, {[pnml], 0, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: net, Parents=[pnml]."),
+    Id_num = get_id_num(maps:get(id, Attr_map)),
+    process_net(Id_num, Attr_map),
+    {[net, pnml], Id_num, 0, 0};
 
-h_ets_begin(place, Attr_map, {Parents=[{net, Net_num}, pnml], Names, Tab_id}) ->
-    Id_num = get_id_num(maps:get(id, Attr_map), Names),
-    true = ets:insert(Tab_id, {{place, Id_num},
-                               #{net_num=>Net_num,
-                                 initial_marking=>0}
-                              }),
-    {[{place, Id_num}|Parents], Names, Tab_id};
+h_ets_begin(place, Attr_map, {Parents=[net, pnml], Net_num, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: place, Parents=~p].", [Parents]),
+    {place, Place_num} = process_place(Attr_map, Net_num),
+    {[place|Parents], Net_num, Place_num, 0};
 
-h_ets_begin(transition, Attr_map, {Parents=[{net, Net_num}, pnml], Names, Tab_id}) ->
-    Id_num = get_id_num(maps:get(id, Attr_map), Names),
-    true = ets:insert(Tab_id, {{transition, Id_num},
-                               #{net_num=>Net_num}
-                              }),
-    {[{transition, Id_num}|Parents], Names, Tab_id};
+h_ets_begin(transition, Attr_map, {Parents=[net, pnml], Net_num, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: transition, Parents=~p].", [Parents]),
+    {transition, _Id_num} = process_transition(Attr_map, Net_num),
+    {[transition|Parents], Net_num, 0, 0};
 
-h_ets_begin(arc, Attr_map, {Parents=[{net, Net_num}, pnml], Names, Tab_id}) ->
-    Id_num     = get_id_num(maps:get(id, Attr_map), Names),
-    Source_num = get_id_num(maps:get(source, Attr_map), Names),
-    Target_num = get_id_num(maps:get(target, Attr_map), Names),
+h_ets_begin(arc, Attr_map, State={Parents=[net, pnml], Net_num, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: arc, State=~p].", [State]),
+    {arc, Arc_num} = process_arc(Attr_map, Net_num),
+    {[arc|Parents], Net_num, 0, Arc_num};
 
-    true = ets:insert(Tab_id, {{arc, Id_num},
-                               #{net_num => Net_num,
-                                 source => Source_num,
-                                 target => Target_num,
-                                 inscription => 1}
-                              }),
-    {[{arc, Id_num}|Parents], Names, Tab_id};
+h_ets_begin(initialMarking, _Attr_map, State={Parents=[place|_], Net_num, Place_num, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: initialMarking, State=~p].", [State]),
+    {[initialMarking|Parents], Net_num, Place_num, 0};
 
-h_ets_begin(referencePlace, Attr_map, {Parents=[{net, _Net_num}, pnml], Names, Tab_id}) ->
-    add_id_ref(maps:get(id, Attr_map),
-               maps:get(ref, Attr_map),
-               Names),
-    {[referencePlace|Parents], Names, Tab_id};
+h_ets_begin(inscription, _Attr_map, State={Parents=[arc|_], Net_num, 0, Arc_num}) ->
+    ?LOG_DEBUG("h_ets_begin: inscription, State=~p].", [State]),
+    {[inscription|Parents], Net_num, 0, Arc_num};
 
-h_ets_begin(referenceTransition, Attr_map, {Parents=[{net, _Net_num}, pnml], Names, Tab_id}) ->
-    add_id_ref(maps:get(id, Attr_map),
-               maps:get(ref, Attr_map),
-               Names),
-    {[referenceTransition|Parents], Names, Tab_id};
+h_ets_begin(referencePlace, Attr_map, State={[net, pnml], Net_num, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: referencePlace, State=~p].", [State]),
+    referencePlace = process_reference(referencePlace, Attr_map),
+    {[referencePlace, net, pnml], Net_num, 0, 0};
 
-h_ets_begin(Tag, _Attr_map, {Parents, Names, Tab_id}) ->
-    ?LOG_DEBUG("h_ets_begin: tag ignored Tag=~p, Parents=~p.", [Tag, Parents]),
-    {[Tag|Parents], Names, Tab_id}.
+h_ets_begin(referenceTransition, Attr_map, State={[net, pnml], Net_num, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: referenceTransition, State=~p].", [State]),
+    referenceTransition = process_reference(referenceTransition, Attr_map),
+    {[referenceTransition, net, pnml], Net_num, 0, 0};
+
+h_ets_begin(text, _Attr_map, State={Parents=[initialMarking|_], Net_num, Place_num, 0}) ->
+    ?LOG_DEBUG("h_ets_begin: initialMarking, State=~p].", [State]),
+    {[text|Parents], Net_num, Place_num, 0};
+
+h_ets_begin(text, _Attr_map, State={Parents=[inscription|_], Net_num, 0, Arc_num}) ->
+    ?LOG_DEBUG("h_ets_begin: inscription, State=~p].", [State]),
+    {[text|Parents], Net_num, 0, Arc_num};
+
+h_ets_begin(Tag, _Attr_map, State) ->
+    ?LOG_DEBUG("h_ets_begin: tag ignored Tag=~p, State=~p.", [Tag, State]),
+    State.
 
 
 %%--------------------------------------------------------------------
-%% @doc Handle an `el_end' element.
+%% @doc Handle an `el_end' request.
 %%
-%% We expect `Tag' to match the first tag in the Parents list. If
+%% We expect `Tag' to match the first tag in the `Parents' list. If
 %% there is a match, then the head of the parents list is
 %% removed. Otherwise, an error is logged.
 %%
-%% The `Parents' list may contain two types of elements, a tuple, such
-%% as `{place, Place_num}', and an atom, such as `initialMarking'. We
-%% cater for both patterns, and nothing else.
+%% The `Parents' list may contain two types of elements, the tuple
+%% `{net, Net_num}', or an `atom', such as `place', `initialMarking',
+%% etc.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec h_ets_end(atom(), h_ets_state()) -> h_ets_state().
-h_ets_end(Tag, {[Tag|Parents], Names, Tab_id}) ->
-    {Parents, Names, Tab_id};
+h_ets_end(pnml, State={[pnml], 0, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_end: pnml, State=~p.", [State]),
+    {[], 0, 0, 0};
 
-h_ets_end(Tag, {Parents=[Tag2|_], Names, Tab_id}) when is_atom(Tag2) ->
-    ?LOG_ERROR("h_ets_end: unexpected end tag, Tag=~p, Parents=~p.",
-               [Tag, Parents]),
-    {Parents, Names, Tab_id};
+h_ets_end(net, State={[net|Rest], _Net_num, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_end: net, State=~p.", [State]),
+    {Rest, 0, 0, 0};
 
-h_ets_end(Tag, {[{Tag, _Id_num}|Parents], Names, Tab_id}) ->
-    {Parents, Names, Tab_id};
+h_ets_end(place, State={[place|Rest], Net_num, _Place_num, 0}) ->
+    ?LOG_DEBUG("h_ets_end: place, State=~p.", [State]),
+    {Rest, Net_num, 0, 0};
 
-h_ets_end(Tag, {Parents=[{Tag2, _Id_num}|_], Names, Tab_id}) when is_atom(Tag2) ->
-    ?LOG_ERROR("h_ets_end: unexpected end tag, Tag=~p, Parents=~p.",
-               [Tag, Parents]),
-    {Parents, Names, Tab_id}.
+h_ets_end(transition, State={[transition|Rest], Net_num, 0, 0}) ->
+    ?LOG_DEBUG("h_ets_end: transition, State=~p.", [State]),
+    {Rest, Net_num, 0, 0};
+
+h_ets_end(arc, State={[arc|Rest], Net_num, 0, _Arc_num}) ->
+    ?LOG_DEBUG("h_ets_end: arc, State=~p.", [State]),
+    {Rest, Net_num, 0, 0};
+
+h_ets_end(initialMarking, State={[initialMarking|Rest], Net_num, Place_num, 0}) ->
+    ?LOG_DEBUG("h_ets_end: initialMarking, State=~p.", [State]),
+    {Rest, Net_num, Place_num, 0};
+
+h_ets_end(inscription, State={[inscription|Rest], Net_num, 0, Arc_num}) ->
+    ?LOG_DEBUG("h_ets_end: inscription, State=~p.", [State]),
+    {Rest, Net_num, 0, Arc_num};
+
+h_ets_end(text, State={[text,initialMarking|Rest], Net_num, Place_num, 0}) ->
+    ?LOG_DEBUG("h_ets_end: text, State=~p.", [State]),
+    {[initialMarking|Rest], Net_num, Place_num, 0};
+
+h_ets_end(text, State={[text,inscription|Rest], Net_num, 0, Arc_num}) ->
+    ?LOG_DEBUG("h_ets_end: text, State=~p.", [State]),
+    {[inscription|Rest], Net_num, 0, Arc_num};
+
+h_ets_end(text, State) ->
+    ?LOG_DEBUG("h_ets_end: text ignored, State=~p.", [State]),
+    State;
+
+h_ets_end(Tag, State) ->
+    ?LOG_WARNING("h_ets_end: unexpected tag - ignored, Tag=~p, State=~p.",
+               [Tag, State]),
+    State.
 
 
 %%--------------------------------------------------------------------
-%% @doc Handle an `el_text' element.
+%% @doc Handle an `el_text' request.
 %%
-%% We are only interested in the within two paths
+%% We are only interested in the text within the two paths
 %% `pnml/net/place/initialMarking/text' and
 %% `pnml/net/arc/inscription/text'. All other text content is ignored.
 %%
@@ -254,49 +299,151 @@ h_ets_end(Tag, {Parents=[{Tag2, _Id_num}|_], Names, Tab_id}) when is_atom(Tag2) 
 %% @end
 %%--------------------------------------------------------------------
 -spec h_ets_text(string(), h_ets_state()) -> h_ets_state().
-h_ets_text(Text, {Parents=[text, initialMarking, Place={place,_Place_Num}|_],
-                  Names, Tab_id}) ->
-    Initial_marking = list_to_integer(Text),
-    [{Place, Place_map}] = ets:lookup(Tab_id, Place),
-    Place_map2 = maps:update(initial_marking, Initial_marking, Place_map),
-    true = ets:update_element(Tab_id, Place, {2, Place_map2}),
-    {Parents, Names, Tab_id};
+h_ets_text(Text, State={[text, initialMarking | _ ], _Net_num, Place_num, 0}) ->
+    ok = process_initialMarking(Text, Place_num),
+    State;
 
-h_ets_text(Text, {Parents=[text, inscription, Arc={arc, _Arc_Num}|_],
-                  Names, Tab_id}) ->
-    Inscription = list_to_integer(Text),
-    [{Arc, Arc_map}] = ets:lookup(Tab_id, Arc),
-    Arc_map2 = maps:update(inscription, Inscription, Arc_map),
-    true = ets:update_element(Tab_id, Arc, {2,Arc_map2}),
-    {Parents, Names, Tab_id};
+h_ets_text(Text, State={[text, inscription | _ ], _Net_num, 0, Arc_num}) ->
+    ok = process_inscription(Text, Arc_num),
+    State;
 
-h_ets_text(Text, {Parents, Names, Tab_id}) ->
-    ?LOG_DEBUG("h_ets_text: text ignored Text=~p, Parents=~p.", [Text, Parents]),
-    {Parents, Names, Tab_id}.
+h_ets_text(Text, State) ->
+    ?LOG_DEBUG("h_ets_text: text ignored Text=~p, State=~p.", [Text, State]),
+    State.
 
 
 %%--------------------------------------------------------------------
-%% @doc Add a new reference name to the Names map for `referencePlace'
+%% @doc Process a `net' element.
+%%
+%% A `net' record will be added to the ETS `net' table.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec process_net(integer(), map()) -> {net, integer()}.
+process_net(Id_num, Attr_map) ->
+    Type = list_to_binary(maps:get(type, Attr_map)),
+    insert_element({ {net, Id_num}, #{type => Type} }),
+    {net, Id_num}.
+
+
+%%--------------------------------------------------------------------
+%% @doc Process `place' element.
+%%
+%% A `place' record will be added to the ETS `net' table with default
+%% `initialMarking' of `0'.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec process_place(map(), integer()) -> {place, integer()}.
+process_place(Attr_map, Net_num) ->
+    Id_num = get_id_num(maps:get(id, Attr_map)),
+    insert_element({ {place, Id_num},
+                     #{net_num => Net_num,
+                       initial_marking => 0}
+                   }),
+    {place, Id_num}.
+
+
+%%--------------------------------------------------------------------
+%% @doc process a `transition' element.
+%%
+%% A `transition' record will be added to the ETS `net' table.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec process_transition(map(), integer()) -> {transition, integer()}.
+process_transition(Attr_map, Net_num) ->
+    Id_num = get_id_num(maps:get(id, Attr_map)),
+    insert_element({ {transition, Id_num},
+                     #{net_num=>Net_num}
+                   }),
+    {transition, Id_num}.
+
+
+%%--------------------------------------------------------------------
+%% @doc Process an `arc' element.
+%%
+%% An `arc' record will be added to the ETS `net' table, along with
+%% the id numbers for the `source' and `target' elements, and default
+%% `inscription' of `1'.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec process_arc(map(), integer()) -> {arc, integer()}.
+process_arc(Attr_map, Net_num) ->
+    Id_num = get_id_num(maps:get(id, Attr_map)),
+    Source_num = get_id_num(maps:get(source, Attr_map)),
+    Target_num = get_id_num(maps:get(target, Attr_map)),
+    insert_element({ {arc, Id_num},
+                     #{net_num => Net_num,
+                       source => Source_num,
+                       target => Target_num,
+                       inscription => 1}
+                   }),
+    {arc, Id_num}.
+
+
+%%--------------------------------------------------------------------
+%% @doc Process a `referencePlace' or `referenceTransition' element.
+%%
+%% A reference item will be added to the names table.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec process_reference(ref_type(), map()) -> ref_type().
+process_reference(Ref_type, Attr_map) ->
+    ok = add_id_ref(maps:get(id, Attr_map), maps:get(ref, Attr_map)),
+    Ref_type.
+
+
+%%--------------------------------------------------------------------
+%% @doc Process an `initialMarking' text field.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec process_initialMarking(string(), integer()) -> ok.
+process_initialMarking(Text, Place_num) ->
+    Initial_marking = list_to_integer(Text),
+    Tab_id = get_net_tid(),
+    [{Place, Place_map}] = ets:lookup(Tab_id, {place, Place_num}),
+    Place_map2 = maps:update(initial_marking, Initial_marking, Place_map),
+    true = ets:update_element(Tab_id, Place, {2, Place_map2}),
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc Process an `inscription' text body.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec process_inscription(string(), integer()) -> ok.
+process_inscription(Text, Arc_num) ->
+    Inscription = list_to_integer(Text),
+    Tab_id = get_net_tid(),
+    [{Arc, Arc_map}] = ets:lookup(Tab_id, {arc, Arc_num}),
+    Arc_map2 = maps:update(inscription, Inscription, Arc_map),
+    true = ets:update_element(Tab_id, Arc, {2,Arc_map2}),
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc Add a new reference name to the Names table for `referencePlace'
 %% and `referenceTransition' PNML elements.
 %%
 %% `Id' and `Ref' are respectively the `id' and `ref' attributes of
 %% the reference element. Both are of `string()' type as provided by
 %% `xmerl', however, they are converted to `binary' strings when saved
-%% in the map.
-%%
-%% `Map' is the table of symbols that is produced and maintained
-%% during parsing.
-%%
-%% `Next_num' is the number to be assigned to the next symbol. This
-%% number is not used for references.
+%% in the table.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec add_id_ref(string(), string(), {map(), integer()}) -> {map(), integer()}.
-add_id_ref(Id, Ref, {Map, Next_num}) ->
+-spec add_id_ref(string(), string()) -> ok.
+add_id_ref(Id, Ref) ->
     Id_bin  = list_to_binary(Id),
     Ref_bin = list_to_binary(Ref),
-    {maps:put(Id_bin, Ref_bin, Map), Next_num}.
+    Tab_id  = get_names_tid(),
+    true = ets:insert(Tab_id, {Id_bin, Ref_bin}),
+    ok.
 
 
 %%--------------------------------------------------------------------
@@ -313,8 +460,9 @@ add_id_ref(Id, Ref, {Map, Next_num}) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec get_id_num(string(), ets:tid()) -> integer().
-get_id_num(Id, Names_tid) ->
+-spec get_id_num(string()) -> integer().
+get_id_num(Id) ->
+    Names_tid = get_names_tid(),
     Id_bin = list_to_binary(Id),
     case ets:lookup(Names_tid, Id_bin) of
         [] -> %% entry not found
@@ -347,11 +495,81 @@ get_id_num(Id, Names_tid) ->
 %% @doc Increment the name index tuple, create it if missing.
 %%
 %% We maintain a `{last_num, integer()}' tuple in the ETS table for
-%% names/numbers. `last_num' is initialized to zero during the first
-%% attempt at incrementing it, and is incremented during each call.
+%% names/numbers. `last_num' is set to `1' during the first call, and
+%% is incremented during each subsequent call.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec next_num(ets:tid()) -> integer().
 next_num(Tab_id) ->
     ets:update_counter(Tab_id, last_num, 1, {last_num, 0}).
+
+
+%%--------------------------------------------------------------------
+%% @doc Return the ETS table id for the net records.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_net_tid() -> ets:tid()|none.
+get_net_tid() ->
+    persistent_term:get({?MODULE, net_tid}, none).
+
+
+%%--------------------------------------------------------------------
+%% @doc Return the ETS table id for the names table.
+%%
+%% @end
+%%-------------------------------------------------------------------
+-spec get_names_tid() -> ets:tid()|none.
+get_names_tid() ->
+    persistent_term:get({?MODULE, names_tid}, none).
+
+
+%%--------------------------------------------------------------------
+%% @doc Insert a net element in the net table.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec insert_element(tuple()) -> ok.
+insert_element(Element) ->
+    Tab_id = get_net_tid(),
+    true = ets:insert(Tab_id, Element),
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc Clean up all data created during the parsing.
+%%
+%% We delete the two ETS tables pointed to by the persistent terms, as
+%% well as the persistent terms.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec cleanup() -> ok.
+cleanup() ->
+    delete_table(get_net_tid()),
+    persistent_term:erase({?MODULE, net_tid}),
+
+    delete_table(get_names_tid()),
+    persistent_term:erase({?MODULE, names_tid}),
+    ok.
+
+
+%%--------------------------------------------------------------------
+%% @doc Delete an ETS table.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec delete_table(ets:tid()|none) -> ok.
+delete_table(none) ->
+    ok;
+delete_table(Tab_id) ->
+    try ets:delete(Tab_id) of
+        true ->
+            ok
+    catch Type:Exception ->
+            ?LOG_WARNING("delete_table: got exception ~p:~p, Tab_id=~p.", [Type, Exception, Tab_id]),
+            ok
+    end.
+
+%%--------------------------------------------------------------------
