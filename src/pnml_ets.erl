@@ -472,31 +472,38 @@ get_id_num(Id) ->
     Names_tid = get_names_tid(),
     Id_bin = list_to_binary(Id),
     case ets:lookup(Names_tid, Id_bin) of
-        [] -> %% entry not found
-            %% create a num entry for the Id
-            Id_num = next_num(Names_tid),
-            ets:insert(Names_tid, {Id_bin, Id_num}),
-            Id_num;
+        [] ->
+            %% entry not found, create a num entry for the Id
+            insert_id_num(Id_bin, Names_tid);
 
         [{Id_bin, Id_num}] when is_integer(Id_num) ->
             %% We found a number entry
             Id_num;
 
-        [{Id_bin, Ref}] -> %% we have a reference entry
-            %% we found a ref entry
-            %% look up the new ref
+        [{Id_bin, Ref}] ->
+            %% we found a ref entry, look up the new ref
             case ets:lookup(Names_tid, Ref) of
-                [] -> %% entry not found
-                    %% create a num entry for the Id
-                    Id_num = next_num(Names_tid),
-                    ets:insert(Names_tid, {Ref, Id_num}),
-                    Id_num;
+                [] ->
+                    %% entry not found, create a num entry
+                    insert_id_num(Ref, Names_tid);
 
                 [{Id_bin, Id_num}] ->
                     %% We found a number entry
                     Id_num
             end
     end.
+
+
+%%--------------------------------------------------------------------
+%% @doc Insert a new entry in the names table.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec insert_id_num(binary(), ets:tid()) -> integer().
+insert_id_num(Id, Tab_id) ->
+    Id_num = next_num(Tab_id),
+    true = ets:insert(Tab_id, {Id, Id_num}),
+    Id_num.
 
 
 %%--------------------------------------------------------------------
