@@ -1,10 +1,26 @@
 %%%-------------------------------------------------------------------
 %%% @author Fred Youhanaie <fyrlang@anydata.co.uk>
-%%% @copyright (C) 2021, Fred Youhanaie
+%%% @copyright 2021-2022, Fred Youhanaie
 %%% @doc
 %%%
 %%% Tools to process `PNML' files - Petri Net Markup Language. See the
 %%% overview docs for further details.
+%%%
+%%% This is a behaviour module to be used by other modules, such as
+%%% pnml_ets, via callbacks.
+%%%
+%%% To start the process of parsing the pnml file, the callback module
+%%% should call the `read/3' function. While `read/3' is scanning the
+%%% PNML file it will call the appropriate handler functions.
+%%%
+%%% The callback module should provide three callback modules,
+%%% `handle_begin/3' will be called whenever a start tag is
+%%% encountered, `handle_end/2' called whenever an end tag is
+%%% detected, and `handle_text/2' is called whenever character data is
+%%% seen.
+%%%
+%%% All three callback handlers are passed the behaviour state, and
+%%% should return the state, optionally updated.
 %%%
 %%% @end
 %%% Created : 16 Jan 2021 by Fred Youhanaie <fyrlang@anydata.co.uk>
@@ -12,67 +28,50 @@
 
 -module(pnml).
 
--export([read/1, read/2]).
--export([h_null/2, h_count/2, h_log/2]).
--export([attr_map/1]).
+-export([read/3, attr_map/1]).
 
 -include_lib("xmerl/include/xmerl.hrl").
 -include_lib("kernel/include/logger.hrl").
 
--define(Default_handler, {fun h_null/2, null}).
-
 %% record type used for the SAX `user_state'
--record(state, {handler_fun, handler_state}).
+-record(state, {cb_module, cb_state}).
 
 %%--------------------------------------------------------------------
 
--type handler_arg() :: {el_begin, atom(), [tuple()]} |
-                       {el_end, atom()} |
-                       {el_text, string()}.
-
-%%--------------------------------------------------------------------
-%% @doc read in an XML file with the default handler.
-%%
-%% See `read/2' for further details.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec read(string()) -> term().
-read(Filename) ->
-    read(Filename, ?Default_handler).
-
+-callback handle_begin(atom(), term(), term()) -> term().
+-callback handle_end(atom(), term()) -> term().
+-callback handle_text(string(), term()) -> term().
 
 %%--------------------------------------------------------------------
 %% @doc Read in a valid XML file and process its elements using the
-%% supplied handler.
+%% supplied callback module.
 %%
 %% It should be noted that `read/2' will read and process any valid
 %% XML file, it is up to the supplied handler to process the PNML
 %% related aspects of the file.
 %%
 %% We expect the file to be a valid XML document, no validation is
-%% performed. However, the supplied handler can perform validation
-%% during the scan.
+%% performed here. However, the supplied callback module can perform
+%% its own validation during the scan.
 %%
 %% We return success/failure result. In case of success, the handler's
 %% final state is returned.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec read(string(),
-              {fun((tuple(), term())->term()), term()}) ->
-          {ok, term()} | {error, term()}.
-read(Filename, {Handler_fun, Handler_state}) ->
+-spec read(string(), atom(), term()) ->
+          {ok, State::term()} | {error, Reason::term()}.
+read(Filename, CB_module, CB_state) ->
     ?LOG_INFO("read: scan started File=~p.", [Filename]),
 
     Scan_opts = [{event_fun, fun event_cb/3},
-                 {event_state, #state{handler_fun=Handler_fun,
-                                      handler_state=Handler_state}}
+                 {event_state, #state{cb_module=CB_module,
+                                      cb_state=CB_state}}
                 ],
 
     Result = case xmerl_sax_parser:file(Filename, Scan_opts) of
                  {ok, State, _Rest} ->
-                     {ok, State#state.handler_state};
+                     {ok, State#state.cb_state};
                  Other_result ->
                      ?LOG_ERROR("read: could not read/parse file (~p).", [Other_result]),
                      Other_result
@@ -94,115 +93,32 @@ read(Filename, {Handler_fun, Handler_state}) ->
 %% It should be noted that `event_cb/3' does not understand, or care
 %% about, PNML files. At this level, this is very much plain XML
 %% processing. All the PNML related processing is carried out in the
-%% handler function.
+%% callback function.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec event_cb(atom(), term(), tuple()) -> tuple().
-event_cb({startElement, _Uri, LocalName, _QualName, Attr}, _Loc, State) ->
+-spec event_cb({atom(), string(), string(), string(), list()}, term(), term()) -> term().
+event_cb({startElement, _Uri, LocalName, _QualName, Attr}, _Loc,
+         State=#state{cb_module=CB_module, cb_state=CB_state0}) ->
     Tag = list_to_atom(LocalName),
-    call_handler({el_begin, Tag, Attr}, State);
+    CB_state1 = CB_module:handle_begin(Tag, Attr, CB_state0),
+    State#state{cb_state=CB_state1};
 
-event_cb({endElement, _Uri, LocalName, _QualName}, _Loc, State) ->
+event_cb({endElement, _Uri, LocalName, _QualName}, _Loc,
+         State=#state{cb_module=CB_module, cb_state=CB_state0}) ->
     Tag = list_to_atom(LocalName),
-    call_handler({el_end, Tag}, State);
+    CB_state1 = CB_module:handle_end(Tag, CB_state0),
+    State#state{cb_state=CB_state1};
 
-event_cb({characters, Text}, _Loc, State) ->
-    call_handler({el_text, Text}, State);
+event_cb({characters, Text}, _Loc,
+         State=#state{cb_module=CB_module, cb_state=CB_state0}) ->
+    CB_state1 = CB_module:handle_text(Text, CB_state0),
+    State#state{cb_state=CB_state1};
 
 event_cb(Event, _Loc, State) ->
     %% we ignore all the other events
     ?LOG_DEBUG("event_cb: IGNORED Ev=~p, St=~p.", [Event, State]),
     State.
-
-
-%%--------------------------------------------------------------------
-%% @doc Call the handler with the supplied `Arg' and SAX user `State'.
-%%
-%% The SAX user state, `State' should contain the handler function and
-%% the current state.
-%%
-%% The return value is the updated handler state, as returned by the
-%% handler function.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec call_handler(handler_arg(), term()) -> term().
-call_handler(Arg, State) ->
-    H_fun = State#state.handler_fun,
-    S_cur = State#state.handler_state,
-    S_new = H_fun(Arg, S_cur),
-    State#state{handler_state=S_new}.
-
-
-%%--------------------------------------------------------------------
-%% @doc The null handler. Does nothing, just behaves as a "compliant
-%% handler".
-%%
-%% This can be used for testing or benchmarking purposes.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec h_null(handler_arg(), term()) -> term().
-h_null(_, State) ->
-    State.
-
-
-%%--------------------------------------------------------------------
-%% @doc Handler that counts the tags.
-%%
-%% Each `el_begin' call increments the count for the corresponding
-%% `Tag'. Everything else, such as attributes, end tags and text are
-%% ignored.
-%%
-%% The state variable for this handler should be a `map'. When calling
-%% `read/2', it is recommended to supply an empty map as the initial
-%% value, i.e. `#{}', although a map with preset values will not be
-%% rejected. If a key for the `Tag' does not exist a new entry will be
-%% created. If a non-numeric entry exists for the `Tag', the increment
-%% operation will cause an exception!
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec h_count(handler_arg(), map()) -> map().
-h_count({el_begin, Tag, _Attr}, Counts) ->
-    ?LOG_INFO("Counts=~p.", [Counts]),
-    C = maps:get(Tag, Counts, 0),
-    maps:put(Tag, C+1, Counts);
-
-h_count({el_end, _Tag}, Counts) ->
-    Counts;
-
-h_count({el_text, _Text}, Counts) ->
-    Counts.
-
-
-%%--------------------------------------------------------------------
-%% @doc Handler that logs the elements.
-%%
-%% The details of the element will be sent to the logger.
-%%
-%% The handler state variable should be a map. If it contains the key
-%% `log_level', then that key will be used for the logging. Otherwise,
-%% the logging will be at `notice' level.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec h_log(handler_arg(), map()) -> map().
-h_log({el_begin, Tag, Attr}, State) ->
-    Level = maps:get(log_level, State, notice),
-    ?LOG(Level, "h_log:S: Tag=~p, Attr=~p.", [Tag, attr_map(Attr)]),
-    maps:put(log_level, Level, State);
-
-h_log({el_end, Tag}, State) ->
-    Level = maps:get(log_level, State, notice),
-    ?LOG(Level, "h_log:E: Tag=~p.", [Tag]),
-    maps:put(log_level, Level, State);
-
-h_log({el_text, Text}, State) ->
-    Level = maps:get(log_level, State, notice),
-    ?LOG(Level, "h_log:T: Text=~p.", [Text]),
-    maps:put(log_level, Level, State).
 
 
 %%--------------------------------------------------------------------
