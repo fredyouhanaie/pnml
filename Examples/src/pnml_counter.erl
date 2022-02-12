@@ -1,0 +1,61 @@
+%%%-------------------------------------------------------------------
+%%% @author Fred Youhanaie <fyrlang@anydata.co.uk>
+%%% @copyright 2022, Fred Youhanaie
+%%% @doc
+%%%
+%%% The pnml `counter' callback module
+%%%
+%%% The module will return count of the element tags found in the PNML
+%%% document.
+%%%
+%%% @end
+%%% Created : 15 Jan 2022 by Fred Youhanaie <fyrlang@anydata.co.uk>
+%%%-------------------------------------------------------------------
+-module(pnml_counter).
+
+-behaviour(pnml).
+
+-include_lib("kernel/include/logger.hrl").
+
+-export([start/1]).
+
+-export([handle_begin/3, handle_end/2, handle_text/2]).
+
+start(File) ->
+    pnml:read(File, ?MODULE, #{}).
+
+%%--------------------------------------------------------------------
+%% @doc Handler that counts the tags.
+%%
+%% Each `handle_begin' call increments the count for the corresponding
+%% `Tag'. Everything else, such as attributes, end tags and text are
+%% ignored.
+%%
+%% The state variable for this handler should be a `map'. When calling
+%% `read/2', it is recommended to supply an empty map as the initial
+%% value, i.e. `#{}', although a map with preset values will not be
+%% rejected. If a key for the `Tag' does not exist a new entry will be
+%% created. If a non-numeric entry exists for the `Tag', the increment
+%% operation will cause an exception!
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec handle_begin(atom(), list(), map()) -> map().
+handle_begin(Tag, _Attr, Counts) ->
+    ?LOG_INFO("Counts=~p.", [Counts]),
+    C = maps:get(Tag, Counts, 0),
+    maps:put(Tag, C+1, Counts).
+
+%%--------------------------------------------------------------------
+
+-spec handle_end(atom(), map()) -> map().
+handle_end(_Tag, Counts) ->
+    Counts.
+
+%%--------------------------------------------------------------------
+
+-spec handle_text(string(), map()) -> map().
+handle_text(_Text, Counts) ->
+    Counts.
+
+%%--------------------------------------------------------------------

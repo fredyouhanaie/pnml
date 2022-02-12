@@ -1,0 +1,21 @@
+<pnml xmlns="http://www.pnml.org/version-2009/grammar/pnml">
+  <net type="http://www.pnml.org/version-2009/grammar/ptnet" id="net_1">
+    <page id="page_1">
+      <place id="place_1">
+        <name>
+          <text>ready</text>
+        </name>
+        <initialMarking>
+          <text>2</text>
+        </initialMarking>
+      </place>
+      <transition id="transition_1">
+      </transition>
+      <arc id="arc_1" source="place_1" target="transition_1">
+        <inscription>
+          <text>2</text>
+        </inscription>
+      </arc>
+    </page>
+  </net>
+</pnml>
