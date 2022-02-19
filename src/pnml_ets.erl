@@ -1,16 +1,16 @@
 %%%-------------------------------------------------------------------
 %%% @author Fred Youhanaie <fyrlang@anydata.co.uk>
-%%% @copyright (C) 2021, Fred Youhanaie
+%%% @copyright 2021-2022, Fred Youhanaie
 %%% @doc
 %%%
-%%% A handler that saves the net elements in an ETS table.
+%%% A callback module that saves the net elements in an ETS table.
 %%%
 %%% Two ETS tables will be created, one for the Petri Net elements,
 %%% and the second for the net element names.
 %%%
 %%% The table for the net elements will contain one record for each of
-%%% PNML elements in the document, i.e. `net', `place', `transition'
-%%% and `arc'.
+%%% the PNML elements in the document, i.e. `net', `place',
+%%% `transition' and `arc'.
 %%%
 %%% The records stored in the ETS table are of one of the following forms:
 %%%
@@ -50,16 +50,23 @@
 %%% Id_num::integer()}'.
 %%%
 %%% The two tables are created by the `read_pt/1' function, and the
-%%% table ids returned as part of the result, if the function is
-%%% successful.
+%%% ETS table ids returned as part of the result, whether the function
+%%% is successful or not.
+%%%
+%%% The calling process is the owner of the ETS tables, and it should
+%%% call `cleanup/0' when the ETS tables are no longer needed.
 %%%
 %%% @end
 %%% Created :  7 Feb 2021 by Fred Youhanaie <fyrlang@anydata.co.uk>
 %%%-------------------------------------------------------------------
 -module(pnml_ets).
 
+-behaviour(pnml).
+
 -export([read_pt/1, cleanup/0]).
 -export([get_id_num/1, add_id_ref/2]).
+
+-export([handle_begin/3, handle_end/2, handle_text/2]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -86,16 +93,15 @@
 %% We create two tables one for the net elements, and the other for
 %% the element names and their corresponding unique numbers.
 %%
-%% Whether succussful, otherwise, the ETS table identifiers are
+%% Whether succussful or not, the ETS table identifiers are
 %% returned to the caller.
 %%
 %% @end
 %%--------------------------------------------------------------------
 -spec read_pt(string()) ->
-          {ok, ets:tid(), ets:tid()} |
-          {{ok, term}, ets:tid(), ets:tid()} |
-          {{error, term}, ets:tid(), ets:tid()}.
-
+          {ok | {error, Reason::term()},
+           Names_tid::ets:tid(),
+           Net_tid::ets:tid()}.
 read_pt(File) ->
     Base_name = atom_to_list(?MODULE),
 
@@ -108,7 +114,7 @@ read_pt(File) ->
     persistent_term:put({?MODULE, names_tid}, Names_tabid),
 
     State0 = {[], 0, 0, 0},
-    case pnml:read(File, {fun h_ets/2, State0}) of
+    case pnml:read(File, ?MODULE, State0) of
         {ok, State0} ->
             {ok, Names_tabid, Net_tabid};
         Other ->
@@ -137,9 +143,9 @@ read_pt(File) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec h_ets(pnml:handler_arg(), h_ets_state()) -> h_ets_state().
-h_ets({el_begin, Tag, Attrs}, State) ->
-    ?LOG_DEBUG("h_ets: el_begin Tag=~p, Attrs=~p, State=~p.",
+-spec handle_begin(atom(), list(), h_ets_state()) -> h_ets_state().
+handle_begin(Tag, Attrs, State) ->
+    ?LOG_DEBUG("begin: Tag=~p, Attrs=~p, State=~p.",
                [Tag, Attrs, State]),
     case lists:member(Tag, ?PT_elements) of
         true ->
@@ -147,26 +153,32 @@ h_ets({el_begin, Tag, Attrs}, State) ->
             h_ets_begin(Tag, Attr_map, State);
         false ->
             State
-    end;
+    end.
 
-h_ets({el_end, Tag}, State) ->
-    ?LOG_DEBUG("h_ets: el_end Tag=~p, State=~p.",
+%%--------------------------------------------------------------------
+
+-spec handle_end(atom(), h_ets_state()) -> h_ets_state().
+handle_end(Tag, State) ->
+    ?LOG_DEBUG("end: Tag=~p, State=~p.",
                [Tag, State]),
     case lists:member(Tag, ?PT_elements) of
         true ->
             h_ets_end(Tag, State);
         false ->
             State
-    end;
+    end.
 
-h_ets({el_text, Text}, State) ->
-    ?LOG_DEBUG("h_ets: el_text Text=~p, State=~p.",
+%%--------------------------------------------------------------------
+
+-spec handle_text(string(), h_ets_state()) -> h_ets_state().
+handle_text(Text, State) ->
+    ?LOG_DEBUG("text: Text=~p, State=~p.",
                [Text, State]),
     h_ets_text(Text, State).
 
 
 %%--------------------------------------------------------------------
-%% @doc Handle an `el_begin' request.
+%% @doc Handle a `begin' request.
 %%
 %% The first parameter is the PNML element tag. Each tag is inserted
 %% at the head of the `Parents' list. Which will later be removed in
@@ -234,7 +246,7 @@ h_ets_begin(Tag, _Attr_map, State) ->
 
 
 %%--------------------------------------------------------------------
-%% @doc Handle an `el_end' request.
+%% @doc Handle an `end' request.
 %%
 %% We expect `Tag' to match the first tag in the `Parents' list. If
 %% there is a match, then the head of the parents list is
@@ -294,7 +306,7 @@ h_ets_end(Tag, State) ->
 
 
 %%--------------------------------------------------------------------
-%% @doc Handle an `el_text' request.
+%% @doc Handle a `text' request.
 %%
 %% We are only interested in the text within the two paths
 %% `pnml/net/place/initialMarking/text' and
@@ -429,7 +441,7 @@ process_inscription(Text, Arc_num) ->
     Tab_id = get_net_tid(),
     [{Arc, Arc_map}] = ets:lookup(Tab_id, {arc, Arc_num}),
     Arc_map2 = maps:update(inscription, Inscription, Arc_map),
-    true = ets:update_element(Tab_id, Arc, {2,Arc_map2}),
+    true = ets:update_element(Tab_id, Arc, {2, Arc_map2}),
     ok.
 
 
@@ -556,7 +568,7 @@ insert_element(Element) ->
 %% @doc Clean up all data created during the parsing.
 %%
 %% We delete the two ETS tables pointed to by the persistent terms, as
-%% well as the persistent terms.
+%% well as the persistent terms themselves.
 %%
 %% @end
 %%--------------------------------------------------------------------
