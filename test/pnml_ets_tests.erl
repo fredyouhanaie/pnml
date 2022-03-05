@@ -84,3 +84,48 @@ read_ets_tiny() ->
     {lists:sort(ets:tab2list(Names_tid)), lists:sort(ets:tab2list(Net_tid))}.
 
 %%--------------------------------------------------------------------
+
+scan_elements_test_() ->
+    {setup, fun setup/0, fun cleanup/1,
+     [{"tiny file",
+       ?_assertMatch({ok, _Names_tid, _Net_tabid},
+                     pnml_ets:read_pt(?Model_tiny)) },
+
+      {"tiny file counts",
+       ?_assertEqual(4, scan_ets_count(?Model_tiny)) },
+
+      {"small file counts",
+       ?_assertEqual(537, scan_ets_count(?Model_small)) },
+
+      {"tiny file contents",
+       ?_assertMatch(?ETS_table_tiny, scan_ets_entries(?Model_tiny)) }
+
+     ]}.
+
+%%--------------------------------------------------------------------
+
+% Read a model into ETS and return a count of its elements via fold
+% function.
+%
+scan_ets_count(File) ->
+    {ok, _Names_tid, Net_tid} = pnml_ets:read_pt(File),
+    Fun = fun (A, _E) -> A+1 end,
+    Counts = pnml_ets:scan_elements(Fun, 0, Net_tid),
+    pnml_ets:cleanup(),
+    Counts.
+
+%%--------------------------------------------------------------------
+
+% Read a model into ETS and return a count of its elements via fold
+% function.
+%
+scan_ets_entries(File) ->
+    {ok, _Names_tid, Net_tid} = pnml_ets:read_pt(File),
+    Fun = fun (A, [E_type, E_num, E_par]) -> 
+                  [{{E_type, E_num}, E_par}|A]
+          end,
+    Entries = pnml_ets:scan_elements(Fun, [], Net_tid),
+    pnml_ets:cleanup(),
+    lists:sort(Entries).
+
+%%--------------------------------------------------------------------

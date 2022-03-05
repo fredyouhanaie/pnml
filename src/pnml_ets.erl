@@ -65,6 +65,7 @@
 
 -export([read_pt/1, cleanup/0]).
 -export([get_id_num/1, add_id_ref/2]).
+-export([scan_elements/2, scan_elements/3]).
 
 -export([handle_begin/3, handle_end/2, handle_text/2]).
 
@@ -601,3 +602,92 @@ delete_table(Tab_id) ->
     end.
 
 %%--------------------------------------------------------------------
+%% @doc Apply function `Fun' to all tuples of the nets ETS table.
+%%
+%% This works in a manner similar to the `lists/foreach/2' function.
+%%
+%% The function `Fun' should take one argument, the net element
+%% details, which is a list of 3 elements, the element type, one of
+%% `net', `place', `transition' or `arc'; the unique integer of the
+%% net element; and a map of element parameters.
+%%
+%% The return value of the function `Fun' is ignored.
+%%
+%% When all the elements have been scanned, `ok' is returned.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_elements(function(), ets:tid()) -> ok.
+scan_elements(Fun, Tab_id) ->
+    Patt = {{'$1', '$2'}, '$3'},
+    case ets:match(Tab_id, Patt, 1) of
+        '$end_of_table' ->
+            ok;
+        {Element, Contin} ->
+            scan_element(Fun, Element, Contin)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc apply the function `Fun' to a single element, then process
+%% the next element in the ETS table, if any.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_element(function(), [list()], any()) -> ok.
+scan_element(Fun, [Element], Contin) ->
+    erlang:apply(Fun, [Element]),
+    case ets:match(Contin) of
+        '$end_of_table' ->
+            ok;
+        {Element2, Contin2} ->
+            scan_element(Fun, Element2, Contin2)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Apply the "fold" function `Fun' to all tuples of the nets ETS
+%% table.
+%%
+%% The function `Fun' should take two arguments, the accumulator of
+%% the fold and the net element details, which is a list of 3
+%% elements, the net element type, one of `net', `place', `transition'
+%% or `arc'; the unique integer corresponding to the net element; and
+%% a map of element parameters.
+%%
+%% The return value of the function `Fun' is used as the `Acc' for the
+%% next call to it, or returned as the final value of the scan, when
+%% the end of the table is reached.
+%%
+%% If the ETS table is empty, `Acc' is returned.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_elements(function(), term(), ets:tid()) -> term().
+scan_elements(Fun, Acc, Tab_id) ->
+    Patt = {{'$1', '$2'}, '$3'},
+    case ets:match(Tab_id, Patt, 1) of
+        '$end_of_table' ->
+            Acc;
+        {[Element], Contin} ->
+            scan_element(Fun, Element, Acc, Contin)
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc apply the function `Fun' to a single element, then process
+%% the next element in the ETS table, if any.
+%%
+%% When the end of the list is reached, the contents of the
+%% accumulator is returned.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_element(function(), list(), term(), any()) -> ok.
+scan_element(Fun, Element, Acc, Contin) ->
+    Acc2 = erlang:apply(Fun, [Acc, Element]),
+    case ets:match(Contin) of
+        '$end_of_table' ->
+            Acc2;
+        {[Element2], Contin2} ->
+            scan_element(Fun, Element2, Acc2, Contin2)
+    end.
+
+%%-------------------------------------------------------------------
