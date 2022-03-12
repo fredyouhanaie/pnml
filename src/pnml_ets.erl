@@ -71,6 +71,10 @@
 
 -include_lib("kernel/include/logger.hrl").
 
+-ifdef(EUNIT).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %%-------------------------------------------------------------------
 
 %% We are only intersted in the following element tags:
@@ -104,15 +108,8 @@
            Names_tid::ets:tid(),
            Net_tid::ets:tid()}.
 read_pt(File) ->
-    Base_name = atom_to_list(?MODULE),
-
-    Net_table = list_to_atom(Base_name ++ "_net"),
-    Net_tabid = ets:new(Net_table, []),
-    persistent_term:put({?MODULE, net_tid}, Net_tabid),
-
-    Names_table = list_to_atom(Base_name ++ "_names"),
-    Names_tabid = ets:new(Names_table, []),
-    persistent_term:put({?MODULE, names_tid}, Names_tabid),
+    Names_tabid = create_table("names_tid"),
+    Net_tabid   = create_table("net_tid"),
 
     State0 = {[], 0, 0, 0},
     case pnml:read(File, ?MODULE, State0) of
@@ -582,6 +579,32 @@ cleanup() ->
     persistent_term:erase({?MODULE, names_tid}),
     ok.
 
+%%--------------------------------------------------------------------
+%% @doc create an ETS table
+%%
+%% The `Table_name' is used as suffix. It is expected, but not
+%% checked, to be one `"net_tid"' or `"names_tid"'.
+%%
+%% The ETS table id will be stored as a `persistent_term', so that it
+%% can be accessed elsewhere in the process, such as cleanup.
+%%
+%% The function also returns the ETS tid to the caller.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec create_table(string()) -> ets:tid()|atom().
+create_table(Table_name) ->
+    create_table(Table_name, []).
+
+-spec create_table(string(), list()) -> ets:tid()|atom().
+create_table(Table_name, Table_opts) ->
+    Base_name = atom_to_list(?MODULE),
+
+    Table = list_to_atom(Base_name ++ "_" ++ Table_name),
+    Tabid = ets:new(Table, Table_opts),
+    persistent_term:put({?MODULE, list_to_atom(Table_name)}, Tabid),
+    Tabid.
+
 
 %%--------------------------------------------------------------------
 %% @doc Delete an ETS table.
@@ -689,5 +712,26 @@ scan_element(Fun, Element, Acc, Contin) ->
         {[Element2], Contin2} ->
             scan_element(Fun, Element2, Acc2, Contin2)
     end.
+
+%%-------------------------------------------------------------------
+%% LOCAL TESTS
+%%-------------------------------------------------------------------
+
+-ifdef(EUNIT).
+
+local_test_() ->
+    {setup, local, %% we need local in order for delete_table to work
+     fun() -> create_table("xxx", []) end,
+     fun(_) -> ok end,
+     fun local_test_check_tables/1
+    }.
+
+local_test_check_tables(Tid) ->
+    {"check tables",
+     [{"create table", ?_assertEqual(pnml_ets_xxx, ets:info(Tid, name))},
+      {"delete table", ?_assertEqual(ok, delete_table(Tid))}
+     ]}.
+
+-endif.
 
 %%-------------------------------------------------------------------
