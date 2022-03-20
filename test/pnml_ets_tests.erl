@@ -129,3 +129,34 @@ scan_ets_entries(File) ->
     lists:sort(Entries).
 
 %%--------------------------------------------------------------------
+
+tables_test_() ->
+    {setup, local, %% we need local in order for delete_table to work
+     fun() -> pnml_ets:create_table("xxx", []) end,
+     fun(_) -> ok end,
+     fun check_tables/1
+    }.
+
+check_tables(Tid) ->
+    [{"create table", ?_assertEqual(pnml_ets_xxx, ets:info(Tid, name))},
+     {"delete table", ?_assertEqual(ok, pnml_ets:delete_table(Tid))}
+    ].
+
+%%-------------------------------------------------------------------
+
+insert_test_() ->
+    {setup, local, %% we need local in order for delete_table to work
+     fun() -> pnml_ets:create_table("net_tid", []) end,
+     fun(_) -> ok end,
+     fun check_insert/1
+    }.
+
+check_insert(Tid) ->
+    Element_key = {abc, 123},
+    Element_map = #{one => 1, two => 2},
+    Element = {Element_key, Element_map},
+    [{"insert", ?_assertEqual(ok, pnml_ets:insert_element(Element))},
+     {"lookup", ?_assertEqual([Element], ets:lookup(Tid, Element_key))}
+    ].
+
+%%-------------------------------------------------------------------

@@ -69,6 +69,11 @@
 
 -export([handle_begin/3, handle_end/2, handle_text/2]).
 
+-ifdef(EUNIT).
+-export([create_table/1, create_table/2, delete_table/1]).
+-export([insert_element/1]).
+-endif.
+
 -include_lib("kernel/include/logger.hrl").
 
 -ifdef(EUNIT).
@@ -713,25 +718,4 @@ scan_element(Fun, Element, Acc, Contin) ->
             scan_element(Fun, Element2, Acc2, Contin2)
     end.
 
-%%-------------------------------------------------------------------
-%% LOCAL TESTS
-%%-------------------------------------------------------------------
-
--ifdef(EUNIT).
-
-local_1_test_() ->
-    {setup, local, %% we need local in order for delete_table to work
-     fun() -> create_table("xxx", []) end,
-     fun(_) -> ok end,
-     fun local_test_check_tables/1
-    }.
-
-local_test_check_tables(Tid) ->
-    {"(local) check tables",
-     [{"create table", ?_assertEqual(pnml_ets_xxx, ets:info(Tid, name))},
-      {"delete table", ?_assertEqual(ok, delete_table(Tid))}
-     ]}.
-
--endif.
-
-%%-------------------------------------------------------------------
+%%--------------------------------------------------------------------
