@@ -719,7 +719,7 @@ scan_element(Fun, Element, Acc, Contin) ->
 
 -ifdef(EUNIT).
 
-local_test_() ->
+local_1_test_() ->
     {setup, local, %% we need local in order for delete_table to work
      fun() -> create_table("xxx", []) end,
      fun(_) -> ok end,
@@ -727,7 +727,7 @@ local_test_() ->
     }.
 
 local_test_check_tables(Tid) ->
-    {"check tables",
+    {"(local) check tables",
      [{"create table", ?_assertEqual(pnml_ets_xxx, ets:info(Tid, name))},
       {"delete table", ?_assertEqual(ok, delete_table(Tid))}
      ]}.
