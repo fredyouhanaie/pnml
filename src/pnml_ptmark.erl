@@ -1,17 +1,16 @@
 %%%-------------------------------------------------------------------
 %%% @author Fred Youhanaie <fyrlang@anydata.co.uk>
-%%% @copyright (C) 2022, Fred Youhanaie
+%%% @copyright 2022, Fred Youhanaie
 %%% @doc
 %%%
 %%% Functions to handle P/T net markings.
 %%%
-%%% A marking is represented as a `map' with the places, unique
-%%% integers, as keys and the number of tokens as the corresponding
-%%% value.
+%%% A marking is represented as a `map' with the places as keys and the number
+%%% of tokens as the corresponding value.
 %%%
-%%% Only places with non-zero tokens are maintained. All functions
-%%% that will generate/compute new markings will remove the zero-token
-%%% places before returning a marking.
+%%% Only places with non-zero tokens are maintained. All functions that generate
+%%% or compute new markings will remove the zero-token places before returning a
+%%% marking.
 %%%
 %%% @end
 %%% Created : 1 Mar 2022 by Fred Youhanaie <fyrlang@anydata.co.uk>
@@ -26,17 +25,15 @@
 %%--------------------------------------------------------------------
 %% @doc add two markings and return the result.
 %%
-%% Each input marking is a map of places to the number of tokens in
-%% that place.
+%% Each input marking is a map of places to the number of tokens in that place.
 %%
-%% The resulting map will contain the union of the keys of the input
-%% maps. The keys that are in the intersection of the two maps will
-%% have their values added together.
+%% The resulting map will contain the union of the keys of the input maps. The
+%% keys that are in the intersection of the two maps will have their values
+%% (token counts) added together.
 %%
-%% Addition of the markings will not generate any places with zero
-%% tokens, however, any places with zero tokens will be checked for
-%% and removed from the resulting marking. This can only occur if such
-%% elements exist in the input maps.
+%% The addition of the markings will not generate any places with zero tokens,
+%% however, places with zero tokens in the result will be checked for and
+%% removed. This can only occur if such elements exist in the input maps.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -48,19 +45,18 @@ add(M1, M2) ->
                    end, M1, M2),
     maps:filter(fun (_K, V) -> V > 0 end, MM).
 
-
 %%--------------------------------------------------------------------
 %% @doc The marking `M2' is subtracted from the marking `M1'.
 %%
-%% We do not check if the set of places (keys) in `M2' is a subset of
-%% those in `M1', as this is expected to have been ensured by the
-%% caller before the subtraction. It is therefore possible to end up
+%% We do not check if the set of places (keys) in `M2' is a subset of those in
+%% `M1', as this is expected to have been ensured by the caller, see
+%% `greater_equal/2', before the subtraction. It is therefore possible to end up
 %% with negative number of tokens!
 %%
 %% Any places not in a marking (map) are assumed to have zero tokens.
 %%
-%% Any places in the resulting marking with zero tokens will be
-%% removed from the result.
+%% Any places in the resulting marking with zero tokens will be removed from the
+%% result.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -72,13 +68,15 @@ sub(M1, M2) ->
     % remove places with zero tokens
     maps:filter(fun (_K, V) -> V /= 0 end, MM).
 
-
 %%--------------------------------------------------------------------
 %% @doc returns `true' if marking `M1' >= `M2'.
 %%
-%% We compare the set of places which is the union of the set of
-%% places in both markings. Any places in one but not the other
-%% marking is considered to have zero tokens in the latter.
+%% We compare the set of places which is the union of the set of places in both
+%% markings. Any places in one but not the other marking is considered to have
+%% zero tokens in the latter.
+%%
+%% This function can be used to check if a transition marking, `M2', is enabled
+%% by its input places marking, `M1'.`
 %%
 %% @end
 %%--------------------------------------------------------------------

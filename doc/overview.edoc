@@ -70,68 +70,65 @@
 
 <h3>Module Overview</h3>
 
-<p>This is a behaviour module to be used by other modules, such as
-  `pnml_ets', via callbacks.
+<p>`pnml` is a behaviour module to be used by other modules, such as `pnml_ets',
+  via callbacks.
 </p>
 
-<p>To start the process of parsing the pnml file, the callback module
-  should call the `read/3' function. While `read/3' is scanning the PNML
-  file it will call the appropriate handler functions.
+<p>To start the process of parsing the pnml file, the callback module should
+  call the `read/3' function. While `read/3' is scanning the PNML file it will
+  call the appropriate handler functions.
 </p>
 
-<p>The callback module should provide three callback modules,
-  `handle_begin/3' will be called whenever a start tag is encountered,
-  `handle_end/2' called whenever an end tag is detected, and
-  `handle_text/2' is called whenever character data is seen.
+<p>The callback module should provide three callback functions, as described
+below.
 </p>
 
 <h4>The Callback Module</h4>
 
-<p>The callback module should export three functions for processing
-the individual PNML elements. these are described below:
+<p>The callback module should export three functions for processing the
+individual PNML elements:
 </p>
 
 <ul>
-  <li>`handle_begin(Tag, Attr, State)', is called when a new tag is
-  encountered. It takes three arguments: `Tag' is an `atom'
-  corresponding to the element tag, such as `net', `place',
-  `transition' etc, and `Attrs' is the list of attributes from the
-  `startElement' event, see `xmerl_sax_parser'. The attributes can be
-  converted to a map of attribute name/value pairs using the
-  `pnml:attr_map/1' function.
+  <li>`handle_begin(Tag, Attr, State)', is called whenever a new tag is
+  encountered. It takes three arguments: `Tag' is an `atom' corresponding to the
+  element tag, such as `net', `place', `transition' etc, and `Attrs' is the list
+  of attributes from the `startElement' event, see `xmerl_sax_parser' for
+  further details. If required, the attributes can be converted to a map of
+  attribute name/value pairs using the `pnml:attr_map/1' function. The third
+  parameter, `State', is explained below.
   </li>
 
-  <li>`handle_end(Tag, State)' corresponds to the `endElement' event,
-    which signals the `</Tag>' element. It can be used to finish off
-    any outstanding work for this element.
+  <li>`handle_end(Tag, State)' corresponds to the `endElement' event, which
+    signals the `</Tag>' element. It can be used to finish off any outstanding
+    work for this element.
   </li>
 
-  <li>`handle_text(Text, State)' corresponds to the `characters'
-    event, which is the text within an element. Most commonly this is
-    an integer corresponding to the `initialMarking' of a `place' or
-    the `inscription' of an `arc'.
+  <li>`handle_text(Text, State)' corresponds to the `characters' event, which is
+    the text within an element. Most commonly this is an integer corresponding
+    to the `initialMarking' of a `place' or the `inscription' of an `arc'.
   </li>
 </ul>
 
-<p>Associated with each callback module is a state variable that is
-  initialized during the call to `pnml:read/3'. The current contents
-  of the state variable is passed to the handler functions, which
-  should return it, optionally updated, for the future calls to the
-  handlers.
+<p>Associated with each callback module is a state variable maintained by
+  `pnml:read/3' function, and is initialized to the value that is supplied to it
+  during the call. The current contents of the state variable is passed to the
+  handler functions, which should return it, optionally updated, for the future
+  calls to the handlers.
 </p>
 
-<p>The structure of the state variable is entirely dependent on the
-  callback module, for example the `pnml_counter' module will maintain
-  a map where the keys are the PNML element tags and the values are
-  counts of the corresponding tags encountered so far.
+<p>The structure of the state variable is entirely dependent on the callback
+  module, for example the `pnml_counter' module will maintain a map where the
+  keys are the PNML element tags and the values are the cumulative counts of the
+  corresponding tags.
 </p>
 
-<p>Once `read/3' has concluded the processing of the file, the final
-  contents of the state variable is returned to the caller.
+<p>Once `read/3' has concluded processing the file, the final contents of the
+  state variable is returned to the caller.
 </p>
 
-<p>A number of sample callback modules have been provided in the
-  `Examples/' directory of the git repo.
+<p>A number of sample callback modules have been provided in the `Examples/'
+  directory of the git repo.
 </p>
 
 @end

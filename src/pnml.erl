@@ -3,24 +3,31 @@
 %%% @copyright 2021-2022, Fred Youhanaie
 %%% @doc
 %%%
-%%% Tools to process `PNML' files - Petri Net Markup Language. See the
-%%% overview docs for further details.
+%%% A set of functions to process `PNML' files - Petri Net Markup Language. See
+%%% the overview doc for further details.
 %%%
-%%% This is a behaviour module to be used by other modules, such as
-%%% pnml_ets, via callbacks.
+%%% This is a behaviour module to be used by other modules, such as pnml_ets and
+%%% pnml_counter, via callbacks.
 %%%
 %%% To start the process of parsing the pnml file, the callback module
 %%% should call the `read/3' function. While `read/3' is scanning the
 %%% PNML file it will call the appropriate handler functions.
 %%%
-%%% The callback module should provide three callback modules,
-%%% `handle_begin/3' will be called whenever a start tag is
-%%% encountered, `handle_end/2' called whenever an end tag is
-%%% detected, and `handle_text/2' is called whenever character data is
-%%% seen.
+%%% The callback module should provide three callback functions:
 %%%
-%%% All three callback handlers are passed the behaviour state, and
-%%% should return the state, optionally updated.
+%%% <ul>
+%%%
+%%% <li>`handle_begin/3' will be called whenever a start tag is
+%%% encountered,</li>
+%%%
+%%% <li>`handle_end/2' will be called whenever an end tag is encountered.</li>
+%%%
+%%% <li>`handle_text/2' is called whenever character data is seen.</li>
+%%%
+%%% </ul>
+%%%
+%%% All three callback handlers are passed the behaviour state, and should
+%%% return the state, optionally updated.
 %%%
 %%% @end
 %%% Created : 16 Jan 2021 by Fred Youhanaie <fyrlang@anydata.co.uk>
@@ -43,19 +50,20 @@
 -callback handle_text(string(), term()) -> term().
 
 %%--------------------------------------------------------------------
-%% @doc Read in a valid XML file and process its elements using the
-%% supplied callback module.
+%% @doc Read in a valid XML file and process its elements using the supplied
+%% callback module.
 %%
-%% It should be noted that `read/2' will read and process any valid
-%% XML file, it is up to the supplied handler to process the PNML
-%% related aspects of the file.
+%% It should be noted that `read/3' will read and process any valid XML file, it
+%% is up to the supplied handler to process the PNML related aspects of the
+%% file.
 %%
-%% We expect the file to be a valid XML document, no validation is
-%% performed here. However, the supplied callback module can perform
-%% its own validation during the scan.
+%% We expect the file to be a valid XML document, no validation is performed
+%% here. However, the supplied callback module can perform its own validation
+%% during the scan.
 %%
-%% We return success/failure result. In case of success, the handler's
-%% final state is returned.
+%% We return success/failure result. In case of success, the handler's final
+%% state is returned. The failure reason may originate from the
+%% `xmerl_sax_parser' module.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -82,18 +90,17 @@ read(Filename, CB_module, CB_state) ->
 
 
 %%--------------------------------------------------------------------
-%% @doc event handler for the SAX parser.
+%% @doc The event handler for the SAX parser.
 %%
-%% We basically handle all the tag starts, ends and character
-%% contents.
+%% We basically handle all the tag starts, ends and character contents, and
+%% ignore the rest.
 %%
-%% The SAX user state is passed to the `handler_caller' as is, and the
-%% result is returned to the SAX parser.
+%% The SAX user state is passed to the `handler_caller' as is, and the result is
+%% returned to the SAX parser.
 %%
-%% It should be noted that `event_cb/3' does not understand, or care
-%% about, PNML files. At this level, this is very much plain XML
-%% processing. All the PNML related processing is carried out in the
-%% callback function.
+%% It should be noted that `event_cb/3' does not understand, or care about, PNML
+%% files. At this level, this is very much plain XML processing. All the PNML
+%% related processing is carried out in the callback function.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -120,15 +127,12 @@ event_cb(Event, _Loc, State) ->
     ?LOG_DEBUG("event_cb: IGNORED Ev=~p, St=~p.", [Event, State]),
     State.
 
-
 %%--------------------------------------------------------------------
-%% @doc Return a map corresponding to the list of attributes from
-%% xmerl.
+%% @doc Return a map corresponding to the list of attributes from xmerl.
 %%
 %% We extract the attribute names and values, and ignore the rest.
 %%
-%% The attribute names are returned as atoms and the values as
-%% strings.
+%% The attribute names are returned as atoms and the values as strings.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -137,3 +141,5 @@ attr_map(Attr) ->
     Attr_to_pair = fun ({_, _, Name, Val}) -> {list_to_atom(Name), Val} end,
     Attr_list = lists:map(Attr_to_pair, Attr),
     maps:from_list(Attr_list).
+
+%%--------------------------------------------------------------------
