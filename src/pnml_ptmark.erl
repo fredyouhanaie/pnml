@@ -76,7 +76,7 @@ sub(M1, M2) ->
 %% zero tokens in the latter.
 %%
 %% This function can be used to check if a transition marking, `M2', is enabled
-%% by its input places marking, `M1'.`
+%% by its input places marking, `M1'.
 %%
 %% @end
 %%--------------------------------------------------------------------
