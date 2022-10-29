@@ -124,9 +124,8 @@ read_pt(File) ->
             {Other, Names_tabid, Net_tabid}
     end.
 
-
 %%--------------------------------------------------------------------
-%% @doc The main handler function.
+%% @doc The begin tag handler callback.
 %%
 %% The handler state is a tuple `{Parents, Net_num, Place_num, Arc_num}',
 %% where, `Parents' is a list, initially empty, that keeps
@@ -159,7 +158,10 @@ handle_begin(Tag, Attrs, State) ->
     end.
 
 %%--------------------------------------------------------------------
-
+%% @doc The end tag callback handler.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec handle_end(atom(), h_ets_state()) -> h_ets_state().
 handle_end(Tag, State) ->
     ?LOG_DEBUG("end: Tag=~p, State=~p.",
@@ -172,13 +174,15 @@ handle_end(Tag, State) ->
     end.
 
 %%--------------------------------------------------------------------
-
+%% @doc The test callback handler.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec handle_text(string(), h_ets_state()) -> h_ets_state().
 handle_text(Text, State) ->
     ?LOG_DEBUG("text: Text=~p, State=~p.",
                [Text, State]),
     h_ets_text(Text, State).
-
 
 %%--------------------------------------------------------------------
 %% @doc Handle a `begin' request.
@@ -247,7 +251,6 @@ h_ets_begin(Tag, _Attr_map, State) ->
     ?LOG_DEBUG("h_ets_begin: tag ignored Tag=~p, State=~p.", [Tag, State]),
     State.
 
-
 %%--------------------------------------------------------------------
 %% @doc Handle an `end' request.
 %%
@@ -307,7 +310,6 @@ h_ets_end(Tag, State) ->
                [Tag, State]),
     State.
 
-
 %%--------------------------------------------------------------------
 %% @doc Handle a `text' request.
 %%
@@ -333,7 +335,6 @@ h_ets_text(Text, State) ->
     ?LOG_DEBUG("h_ets_text: text ignored Text=~p, State=~p.", [Text, State]),
     State.
 
-
 %%--------------------------------------------------------------------
 %% @doc Process a `net' element.
 %%
@@ -346,7 +347,6 @@ process_net(Id_num, Attr_map) ->
     Type = list_to_binary(maps:get(type, Attr_map)),
     insert_element({ {net, Id_num}, #{type => Type} }),
     {net, Id_num}.
-
 
 %%--------------------------------------------------------------------
 %% @doc Process `place' element.
@@ -365,7 +365,6 @@ process_place(Attr_map, Net_num) ->
                    }),
     {place, Id_num}.
 
-
 %%--------------------------------------------------------------------
 %% @doc process a `transition' element.
 %%
@@ -380,7 +379,6 @@ process_transition(Attr_map, Net_num) ->
                      #{net_num=>Net_num}
                    }),
     {transition, Id_num}.
-
 
 %%--------------------------------------------------------------------
 %% @doc Process an `arc' element.
@@ -404,7 +402,6 @@ process_arc(Attr_map, Net_num) ->
                    }),
     {arc, Id_num}.
 
-
 %%--------------------------------------------------------------------
 %% @doc Process a `referencePlace' or `referenceTransition' element.
 %%
@@ -416,7 +413,6 @@ process_arc(Attr_map, Net_num) ->
 process_reference(Ref_type, Attr_map) ->
     ok = add_id_ref(maps:get(id, Attr_map), maps:get(ref, Attr_map)),
     Ref_type.
-
 
 %%--------------------------------------------------------------------
 %% @doc Process an `initialMarking' text field.
@@ -432,7 +428,6 @@ process_initialMarking(Text, Place_num) ->
     true = ets:update_element(Tab_id, Place, {2, Place_map2}),
     ok.
 
-
 %%--------------------------------------------------------------------
 %% @doc Process an `inscription' text body.
 %%
@@ -446,7 +441,6 @@ process_inscription(Text, Arc_num) ->
     Arc_map2 = maps:update(inscription, Inscription, Arc_map),
     true = ets:update_element(Tab_id, Arc, {2, Arc_map2}),
     ok.
-
 
 %%--------------------------------------------------------------------
 %% @doc Add a new reference name to the Names table for `referencePlace'
@@ -466,7 +460,6 @@ add_id_ref(Id, Ref) ->
     Tab_id  = get_names_tid(),
     true = ets:insert(Tab_id, {Id_bin, Ref_bin}),
     ok.
-
 
 %%--------------------------------------------------------------------
 %% @doc Return the id number for a given PNML element id name.
@@ -508,7 +501,6 @@ get_id_num(Id) ->
             end
     end.
 
-
 %%--------------------------------------------------------------------
 %% @doc Insert a new entry in the names table.
 %%
@@ -519,7 +511,6 @@ insert_id_num(Id, Tab_id) ->
     Id_num = next_num(Tab_id),
     true = ets:insert(Tab_id, {Id, Id_num}),
     Id_num.
-
 
 %%--------------------------------------------------------------------
 %% @doc Increment the name index tuple, create it if missing.
@@ -534,7 +525,6 @@ insert_id_num(Id, Tab_id) ->
 next_num(Tab_id) ->
     ets:update_counter(Tab_id, last_num, 1, {last_num, 0}).
 
-
 %%--------------------------------------------------------------------
 %% @doc Return the ETS table id for the net records.
 %%
@@ -544,7 +534,6 @@ next_num(Tab_id) ->
 get_net_tid() ->
     persistent_term:get({?MODULE, net_tid}, none).
 
-
 %%--------------------------------------------------------------------
 %% @doc Return the ETS table id for the names table.
 %%
@@ -553,7 +542,6 @@ get_net_tid() ->
 -spec get_names_tid() -> ets:tid()|none.
 get_names_tid() ->
     persistent_term:get({?MODULE, names_tid}, none).
-
 
 %%--------------------------------------------------------------------
 %% @doc Insert a net element in the net table.
@@ -565,7 +553,6 @@ insert_element(Element) ->
     Tab_id = get_net_tid(),
     true = ets:insert(Tab_id, Element),
     ok.
-
 
 %%--------------------------------------------------------------------
 %% @doc Clean up all data created during the parsing.
@@ -585,15 +572,9 @@ cleanup() ->
     ok.
 
 %%--------------------------------------------------------------------
-%% @doc create an ETS table
+%% @doc create an ETS table with default ETS options.
 %%
-%% The `Table_name' is used as suffix. It is expected, but not
-%% checked, to be one `"net_tid"' or `"names_tid"'.
-%%
-%% The ETS table id will be stored as a `persistent_term', so that it
-%% can be accessed elsewhere in the process, such as cleanup.
-%%
-%% The function also returns the ETS tid to the caller.
+%% See `create_table/2' for details.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -601,6 +582,19 @@ cleanup() ->
 create_table(Table_name) ->
     create_table(Table_name, []).
 
+%%--------------------------------------------------------------------
+%% @doc create an ETS table with the given options.
+%%
+%% The `Table_name' is used as suffix. It is expected, but not checked, to be
+%% one of `"net_tid"' or `"names_tid"'.
+%%
+%% The ETS table id will be stored as a `persistent_term', so that it can be
+%% accessed elsewhere in the process, such as cleanup.
+%%
+%% The function also returns the ETS tid to the caller.
+%%
+%% @end
+%%--------------------------------------------------------------------
 -spec create_table(string(), list()) -> ets:tid()|atom().
 create_table(Table_name, Table_opts) ->
     Base_name = atom_to_list(?MODULE),
@@ -609,7 +603,6 @@ create_table(Table_name, Table_opts) ->
     Tabid = ets:new(Table, Table_opts),
     persistent_term:put({?MODULE, list_to_atom(Table_name)}, Tabid),
     Tabid.
-
 
 %%--------------------------------------------------------------------
 %% @doc Delete an ETS table.
@@ -632,7 +625,7 @@ delete_table(Tab_id) ->
 %%--------------------------------------------------------------------
 %% @doc Apply function `Fun' to all tuples of the nets ETS table.
 %%
-%% This works in a manner similar to the `lists/foreach/2' function.
+%% This works in a manner similar to the `lists:foreach/2' function.
 %%
 %% The function `Fun' should take one argument, the net element
 %% details, which is a list of 3 elements, the element type, one of
@@ -656,8 +649,7 @@ scan_elements(Fun, Tab_id) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @doc apply the function `Fun' to a single element, then process
-%% the next element in the ETS table, if any.
+%% @doc Apply function `Fun' to a single element, then process the rest.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -672,18 +664,16 @@ scan_element(Fun, [Element], Contin) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @doc Apply the "fold" function `Fun' to all tuples of the nets ETS
-%% table.
+%% @doc Apply the "fold" function `Fun' to all tuples of the nets ETS table.
 %%
-%% The function `Fun' should take two arguments, the accumulator of
-%% the fold and the net element details, which is a list of 3
-%% elements, the net element type, one of `net', `place', `transition'
-%% or `arc'; the unique integer corresponding to the net element; and
-%% a map of element parameters.
+%% The function `Fun' should take two arguments, the accumulator of the fold and
+%% the net element details, which is a list of 3 elements, the net element type,
+%% one of `net', `place', `transition' or `arc'; the unique integer
+%% corresponding to the net element; and a map of element parameters.
 %%
-%% The return value of the function `Fun' is used as the `Acc' for the
-%% next call to it, or returned as the final value of the scan, when
-%% the end of the table is reached.
+%% The return value of the function `Fun' is used as the `Acc' for the next call
+%% to it, or returned as the final value of the scan, when the end of the table
+%% is reached.
 %%
 %% If the ETS table is empty, `Acc' is returned.
 %%
@@ -700,11 +690,11 @@ scan_elements(Fun, Acc, Tab_id) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @doc apply the function `Fun' to a single element, then process
-%% the next element in the ETS table, if any.
+%% @doc apply the function `Fun' to a single element, then process the next
+%% element in the ETS table, if any.
 %%
-%% When the end of the list is reached, the contents of the
-%% accumulator is returned.
+%% When the end of the list is reached, the contents of the accumulator is
+%% returned.
 %%
 %% @end
 %%--------------------------------------------------------------------
