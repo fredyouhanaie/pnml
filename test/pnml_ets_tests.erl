@@ -131,7 +131,7 @@ scan_ets_entries(File) ->
 %%--------------------------------------------------------------------
 
 tables_test_() ->
-    {setup, local, %% we need local in order for delete_table to work
+    {setup,
      fun() -> pnml_ets:create_table("xxx", []) end,
      fun(_) -> ok end,
      fun check_tables/1
@@ -145,9 +145,9 @@ check_tables(Tid) ->
 %%-------------------------------------------------------------------
 
 insert_test_() ->
-    {setup, local, %% we need local in order for delete_table to work
+    {setup, local, %% local needed for insert to have access
      fun() -> pnml_ets:create_table("net_tid", []) end,
-     fun(_) -> ok end,
+     fun(_Tid) -> pnml_ets:cleanup() end,
      fun check_insert/1
     }.
 

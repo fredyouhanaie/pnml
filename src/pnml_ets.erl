@@ -76,10 +76,6 @@
 
 -include_lib("kernel/include/logger.hrl").
 
--ifdef(EUNIT).
--include_lib("eunit/include/eunit.hrl").
--endif.
-
 %%-------------------------------------------------------------------
 
 %% We are only intersted in the following element tags:
