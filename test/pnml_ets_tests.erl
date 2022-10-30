@@ -145,7 +145,7 @@ check_tables(Tid) ->
 %%-------------------------------------------------------------------
 
 insert_test_() ->
-    {setup, local, %% local needed for insert to have access
+    {setup, local, %% local needed for insert access rights
      fun() -> pnml_ets:create_table("net_tid", []) end,
      fun(_Tid) -> pnml_ets:cleanup() end,
      fun check_insert/1
@@ -157,6 +157,22 @@ check_insert(Tid) ->
     Element = {Element_key, Element_map},
     [{"insert", ?_assertEqual(ok, pnml_ets:insert_element(Element))},
      {"lookup", ?_assertEqual([Element], ets:lookup(Tid, Element_key))}
+    ].
+
+%%-------------------------------------------------------------------
+
+process_test_() ->
+    {setup, local, %% local needed for insert access rights
+     fun() -> pnml_ets:create_table("net_tid", []) end,
+     fun(_Tid) -> pnml_ets:cleanup() end,
+     fun local_test_process/1
+    }.
+
+local_test_process(Tid) ->
+    [{"add_net", ?_assertEqual({net, 1},
+                               pnml_ets:process_net(1, #{type => "http://www.pnml.org/version-2009/grammar/ptnet"}))},
+     {"chk_net", ?_assertEqual([{{net, 1}, #{type => <<"http://www.pnml.org/version-2009/grammar/ptnet">>}}],
+                               ets:lookup(Tid, {net, 1}))}
     ].
 
 %%-------------------------------------------------------------------

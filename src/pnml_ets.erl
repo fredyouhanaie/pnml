@@ -72,6 +72,7 @@
 -ifdef(EUNIT).
 -export([create_table/1, create_table/2, delete_table/1]).
 -export([insert_element/1]).
+-export([process_net/2]).
 -endif.
 
 -include_lib("kernel/include/logger.hrl").
