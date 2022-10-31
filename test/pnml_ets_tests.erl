@@ -163,16 +163,36 @@ check_insert(Tid) ->
 
 process_test_() ->
     {setup, local, %% local needed for insert access rights
-     fun() -> pnml_ets:create_table("net_tid", []) end,
+     fun() ->
+             {pnml_ets:create_table("net_tid", []),
+              pnml_ets:create_table("names_tid", [])}
+     end,
      fun(_Tid) -> pnml_ets:cleanup() end,
      fun local_test_process/1
     }.
 
-local_test_process(Tid) ->
-    [{"add_net", ?_assertEqual({net, 1},
-                               pnml_ets:process_net(1, #{type => "http://www.pnml.org/version-2009/grammar/ptnet"}))},
+local_test_process({Net_tid, _Names_tid}) ->
+    [{"add_net", ?_assertEqual({net, 1}, add_net())},
      {"chk_net", ?_assertEqual([{{net, 1}, #{type => <<"http://www.pnml.org/version-2009/grammar/ptnet">>}}],
-                               ets:lookup(Tid, {net, 1}))}
+                               ets:lookup(Net_tid, {net, 1}))},
+
+     {"add_place", ?_assertEqual({place, 2}, pnml_ets:process_place(#{id=>"place_1"}, 1))},
+     {"chk_place", ?_assertEqual([{{place,2}, #{initial_marking => 0, net_num => 1}}],
+                                 ets:lookup(Net_tid, {place, 2}))},
+
+     {"add_trans", ?_assertEqual({transition, 3}, pnml_ets:process_transition(#{id=>"trans_1"}, 1))},
+     {"chk_trans", ?_assertEqual([{{transition, 3}, #{net_num => 1}}],
+                                 ets:lookup(Net_tid, {transition, 3}))},
+
+     {"add_arc", ?_assertEqual({arc, 4},
+                               pnml_ets:process_arc(#{id=>"arc_1", source=>"2", target=>"3"}, 1))},
+     {"chk_arc", ?_assertEqual([{{arc, 4}, #{inscription => 1,net_num => 1,source => 5,target => 6}}],
+                               ets:lookup(Net_tid, {arc, 4}))}
     ].
+
+add_net() ->
+    Attr_map = #{id => "net_1", type => "http://www.pnml.org/version-2009/grammar/ptnet"},
+    Id_num = pnml_ets:get_id_num(maps:get(id, Attr_map)),
+    pnml_ets:process_net(Id_num, Attr_map).
 
 %%-------------------------------------------------------------------
