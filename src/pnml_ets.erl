@@ -123,7 +123,7 @@ read_pt(File) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @doc The begin tag handler callback.
+%% @doc The begin tag callback handler.
 %%
 %% The handler state is a tuple `{Parents, Net_num, Place_num, Arc_num}',
 %% where, `Parents' is a list, initially empty, that keeps
@@ -172,7 +172,7 @@ handle_end(Tag, State) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @doc The test callback handler.
+%% @doc The text callback handler.
 %%
 %% @end
 %%--------------------------------------------------------------------
@@ -183,6 +183,7 @@ handle_text(Text, State) ->
     h_ets_text(Text, State).
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Handle a `begin' request.
 %%
 %% The first parameter is the PNML element tag. Each tag is inserted
@@ -250,6 +251,7 @@ h_ets_begin(Tag, _Attr_map, State) ->
     State.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Handle an `end' request.
 %%
 %% We expect `Tag' to match the first tag in the `Parents' list. If
@@ -309,6 +311,7 @@ h_ets_end(Tag, State) ->
     State.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Handle a `text' request.
 %%
 %% We are only interested in the text within the two paths
@@ -334,6 +337,7 @@ h_ets_text(Text, State) ->
     State.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Process a `net' element.
 %%
 %% A `net' record will be added to the ETS `net' table.
@@ -347,6 +351,7 @@ process_net(Id_num, Attr_map) ->
     {net, Id_num}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Process `place' element.
 %%
 %% A `place' record will be added to the ETS `net' table with default
@@ -364,6 +369,7 @@ process_place(Attr_map, Net_num) ->
     {place, Id_num}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc process a `transition' element.
 %%
 %% A `transition' record will be added to the ETS `net' table.
@@ -379,6 +385,7 @@ process_transition(Attr_map, Net_num) ->
     {transition, Id_num}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Process an `arc' element.
 %%
 %% An `arc' record will be added to the ETS `net' table, along with
@@ -401,6 +408,7 @@ process_arc(Attr_map, Net_num) ->
     {arc, Id_num}.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Process a `referencePlace' or `referenceTransition' element.
 %%
 %% A reference item will be added to the names table.
@@ -413,6 +421,7 @@ process_reference(Ref_type, Attr_map) ->
     Ref_type.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Process an `initialMarking' text field.
 %%
 %% @end
@@ -427,6 +436,7 @@ process_initialMarking(Text, Place_num) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Process an `inscription' text body.
 %%
 %% @end
@@ -441,6 +451,7 @@ process_inscription(Text, Arc_num) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Add a new reference name to the Names table for `referencePlace'
 %% and `referenceTransition' PNML elements.
 %%
@@ -460,6 +471,7 @@ add_id_ref(Id, Ref) ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Return the id number for a given PNML element id name.
 %%
 %% If the name does not exist, a new entry with a new unique number is
@@ -542,6 +554,7 @@ get_names_tid() ->
     persistent_term:get({?MODULE, names_tid}, none).
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Insert a net element in the net table.
 %%
 %% @end
@@ -570,6 +583,7 @@ cleanup() ->
     ok.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc create an ETS table with default ETS options.
 %%
 %% See `create_table/2' for details.
@@ -581,6 +595,7 @@ create_table(Table_name) ->
     create_table(Table_name, []).
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc create an ETS table with the given options.
 %%
 %% The `Table_name' is used as suffix. It is expected, but not checked, to be
@@ -603,6 +618,7 @@ create_table(Table_name, Table_opts) ->
     Tabid.
 
 %%--------------------------------------------------------------------
+%% @private
 %% @doc Delete an ETS table.
 %%
 %% @end
@@ -625,12 +641,8 @@ delete_table(Tab_id) ->
 %%
 %% This works in a manner similar to the `lists:foreach/2' function.
 %%
-%% The function `Fun' should take one argument, the net element
-%% details, which is a list of 3 elements, the element type, one of
-%% `net', `place', `transition' or `arc'; the unique integer of the
-%% net element; and a map of element parameters.
-%%
-%% The return value of the function `Fun' is ignored.
+%% The function `Fun' should take one argument, the net element tuple. The
+%% return value of the function `Fun' is ignored.
 %%
 %% When all the elements have been scanned, `ok' is returned.
 %%
@@ -647,9 +659,7 @@ scan_elements(Fun) ->
 %% @doc Apply the "fold" function `Fun' to all tuples of the nets ETS table.
 %%
 %% The function `Fun' should take two arguments, the accumulator of the fold and
-%% the net element details, which is a list of 3 elements, the net element type,
-%% one of `net', `place', `transition' or `arc'; the unique integer
-%% corresponding to the net element; and a map of element parameters.
+%% the net element tuple.
 %%
 %% We use ets:foldl/3 to scan the elements.
 %%
@@ -670,9 +680,8 @@ scan_elements(Fun, Acc) ->
 %% elements matching the pattern `Patt'.
 %%
 %% The pattern should be that accepted by `ets:match/2,3', for example the
-%% following pattern will produce pairs of places and their initial marking:
-%%
-%% `{{place, '$1'}, #{initial_marking => '$2'}}`
+%% pattern <pre>{{place, '$1'}, #{initial_marking => '$2'}}</pre> will produce
+%% pairs of places and their initial marking `[[p1, 1], [p2, 5], ...]''
 %%
 %% The function `Fun' should take two args, the accumulator `Acc' and a list of
 %% elements that will correspond to the place holders in the match pattern.
