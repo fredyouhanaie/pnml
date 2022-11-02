@@ -18,7 +18,7 @@
 
 -module(pnml_ptmark).
 
--export([add/2, sub/2, greater_equal/2]).
+-export([add/2, sub/2, greater_equal/2, remove_zeros/1]).
 
 -include_lib("kernel/include/logger.hrl").
 
@@ -43,7 +43,7 @@ add(M1, M2) ->
     MM = maps:fold(fun (K, V, Acc) ->
                            Acc#{K => maps:get(K, Acc, 0)+V}
                    end, M1, M2),
-    maps:filter(fun (_K, V) -> V > 0 end, MM).
+    remove_zeros(MM).
 
 %%--------------------------------------------------------------------
 %% @doc The marking `M2' is subtracted from the marking `M1'.
@@ -53,7 +53,8 @@ add(M1, M2) ->
 %% `greater_equal/2', before the subtraction. It is therefore possible to end up
 %% with negative number of tokens!
 %%
-%% Any places not in a marking (map) are assumed to have zero tokens.
+%% Any places not in a marking (map), either `M1' or `M2' are assumed to have
+%% zero tokens.
 %%
 %% Any places in the resulting marking with zero tokens will be removed from the
 %% result.
@@ -66,7 +67,7 @@ sub(M1, M2) ->
                            Acc#{K => maps:get(K, Acc, 0)-V}
                    end, M1, M2),
     % remove places with zero tokens
-    maps:filter(fun (_K, V) -> V /= 0 end, MM).
+    remove_zeros(MM).
 
 %%--------------------------------------------------------------------
 %% @doc returns `true' if marking `M1' >= `M2'.
@@ -87,5 +88,15 @@ greater_equal(M1, M2) ->
                 Greater_Eq and (maps:get(Place, M1, 0) >= maps:get(Place, M2, 0))
         end,
     lists:foldl(F, true, MM_places).
+
+%%--------------------------------------------------------------------
+%% @doc Remove the places with zero tokens.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec remove_zeros(map()) -> map().
+remove_zeros(M) ->
+    Non_zero = fun (_Place, Tokens) -> Tokens /= 0 end,
+    maps:filter(Non_zero, M).
 
 %%--------------------------------------------------------------------
