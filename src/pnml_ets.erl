@@ -64,13 +64,13 @@
 -behaviour(pnml).
 
 -export([read_pt/1, cleanup/0]).
--export([get_id_num/1, add_id_ref/2]).
 -export([scan_elements/1, scan_elements/2, scan_elements/3]).
 
 %% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
 
 -ifdef(EUNIT).
+-export([get_id_num/1, add_id_ref/2]).
 -export([create_table/1, create_table/2, delete_table/1]).
 -export([insert_element/1]).
 -export([process_net/2, process_place/2, process_transition/2, process_arc/2]).
