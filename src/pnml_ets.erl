@@ -69,6 +69,8 @@
 %% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
 
+-export([init_marking/0, init_marking/1]).
+
 -ifdef(EUNIT).
 -export([get_id_num/1, add_id_ref/2]).
 -export([create_table/1, create_table/2, delete_table/1]).
@@ -716,5 +718,42 @@ scan_element(Fun, Element, Acc, Contin) ->
         {[Element2], Contin2} ->
             scan_element(Fun, Element2, Acc2, Contin2)
     end.
+
+%%--------------------------------------------------------------------
+%% @doc return a list of all `net' elements in the nets table.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec get_nets() -> [integer()].
+get_nets() ->
+    lists:flatten(ets:match(get_net_tid(), {{net, '$1'}, '_'})).
+
+%%--------------------------------------------------------------------
+%% @doc Return a map of the initial markings of all the nets.
+%%
+%% We return map of `{Net_num => Init_marking}' elements.
+%%
+%% See init_marking/1 for details.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec init_marking() -> map().
+init_marking() ->
+    Nets = get_nets(),
+    Net_init_markings = [ {N, init_marking(N)} || N <- Nets ],
+    maps:from_list(Net_init_markings).
+
+%%--------------------------------------------------------------------
+%% @doc Return the initial markings of a net (`Net_num') as a map.
+%%
+%% The initial marking is a map of `#{Place => Tokens}' elements.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec init_marking(integer()) -> map().
+init_marking(Net_num) ->
+    F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
+    Init_marking = scan_elements({{place, '$1'}, #{initial_marking => '$2', net_num => Net_num}}, F, []),
+    pnml_ptmark:remove_zeros(maps:from_list(Init_marking)).
 
 %%--------------------------------------------------------------------

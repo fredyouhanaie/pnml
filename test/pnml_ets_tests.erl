@@ -16,6 +16,10 @@
 -define(Model_tiny,   "test/ptnet_1.pnml").
 -define(Model_small,  "test/distributeur-01-unfolded-02.pnml").
 
+-define(Init_mark_tiny, #{2 => 2}).
+-define(Init_mark_small, #{2 => 1, 3 => 1,  4 => 1,  5 => 1,  6 => 1,  7 => 1,
+                           8 => 1, 9 => 1, 10 => 1, 11 => 1, 12 => 1, 13 => 1}).
+
 %% Change `Log_level' if investigating failed tests
 -define(Log_level, critical).
 
@@ -192,5 +196,19 @@ add_net() ->
     Attr_map = #{id => "net_1", type => "http://www.pnml.org/version-2009/grammar/ptnet"},
     Id_num = pnml_ets:get_id_num(maps:get(id, Attr_map)),
     pnml_ets:process_net(Id_num, Attr_map).
+
+%%-------------------------------------------------------------------
+
+init_mark_test_() ->
+    {"Initial marking",
+     [{ "tiny all",    ?_assertEqual(#{1 => ?Init_mark_tiny},  get_init_mark(?Model_tiny))},
+      { "small all",   ?_assertEqual(#{1 => ?Init_mark_small}, get_init_mark(?Model_small))}
+     ]}.
+
+get_init_mark(File) ->
+    {ok, _Names_tid, _Net_tid} = pnml_ets:read_pt(File),
+    Marking = pnml_ets:init_marking(),
+    pnml_ets:cleanup(),
+    Marking.
 
 %%-------------------------------------------------------------------
