@@ -65,8 +65,9 @@
 
 -export([read_pt/1, cleanup/0]).
 -export([get_id_num/1, add_id_ref/2]).
--export([scan_elements/2, scan_elements/3]).
+-export([scan_elements/1, scan_elements/2, scan_elements/3]).
 
+%% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
 
 -ifdef(EUNIT).
@@ -635,30 +636,12 @@ delete_table(Tab_id) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec scan_elements(function(), ets:tid()) -> ok.
-scan_elements(Fun, Tab_id) ->
-    Patt = {{'$1', '$2'}, '$3'},
-    case ets:match(Tab_id, Patt, 1) of
-        '$end_of_table' ->
-            ok;
-        {Element, Contin} ->
-            scan_element(Fun, Element, Contin)
-    end.
-
-%%--------------------------------------------------------------------
-%% @doc Apply function `Fun' to a single element, then process the rest.
-%%
-%% @end
-%%--------------------------------------------------------------------
--spec scan_element(function(), [list()], any()) -> ok.
-scan_element(Fun, [Element], Contin) ->
-    erlang:apply(Fun, [Element]),
-    case ets:match(Contin) of
-        '$end_of_table' ->
-            ok;
-        {Element2, Contin2} ->
-            scan_element(Fun, Element2, Contin2)
-    end.
+-spec scan_elements(function()) -> ok.
+scan_elements(Fun) ->
+    Tab_id = get_net_tid(),
+    Fun2 = fun (Acc, Elem) -> Fun(Elem), Acc end,
+    ets:foldl(Fun2, [], Tab_id),
+    ok.
 
 %%--------------------------------------------------------------------
 %% @doc Apply the "fold" function `Fun' to all tuples of the nets ETS table.
@@ -668,17 +651,37 @@ scan_element(Fun, [Element], Contin) ->
 %% one of `net', `place', `transition' or `arc'; the unique integer
 %% corresponding to the net element; and a map of element parameters.
 %%
-%% The return value of the function `Fun' is used as the `Acc' for the next call
-%% to it, or returned as the final value of the scan, when the end of the table
-%% is reached.
+%% We use ets:foldl/3 to scan the elements.
 %%
 %% If the ETS table is empty, `Acc' is returned.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec scan_elements(function(), term(), ets:tid()) -> term().
-scan_elements(Fun, Acc, Tab_id) ->
-    Patt = {{'$1', '$2'}, '$3'},
+-spec scan_elements(function(), term()) -> term().
+scan_elements(Fun, Acc) ->
+    Tab_id = get_net_tid(),
+    ets:foldl(Fun, Acc, Tab_id).
+
+%%--------------------------------------------------------------------
+%% @doc Apply the fold function`Fun' to the elements of the nets table that
+%% match our pattern.
+%%
+%% This works similar to `scan_elements/2' but only applies the function to the
+%% elements matching the pattern `Patt'.
+%%
+%% The pattern should be that accepted by `ets:match/2,3', for example the
+%% following pattern will produce pairs of places and their initial marking:
+%%
+%% `{{place, '$1'}, #{initial_marking => '$2'}}`
+%%
+%% The function `Fun' should take two args, the accumulator `Acc' and a list of
+%% elements that will correspond to the place holders in the match pattern.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_elements(term(), function(), term()) -> term().
+scan_elements(Patt, Fun, Acc) ->
+    Tab_id = get_net_tid(),
     case ets:match(Tab_id, Patt, 1) of
         '$end_of_table' ->
             Acc;
@@ -695,9 +698,9 @@ scan_elements(Fun, Acc, Tab_id) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec scan_element(function(), list(), term(), any()) -> ok.
+-spec scan_element(function(), list(), term(), any()) -> term().
 scan_element(Fun, Element, Acc, Contin) ->
-    Acc2 = erlang:apply(Fun, [Acc, Element]),
+    Acc2 = erlang:apply(Fun, [Element, Acc]),
     case ets:match(Contin) of
         '$end_of_table' ->
             Acc2;

@@ -108,9 +108,9 @@ scan_elements_test_() ->
 % function.
 %
 scan_ets_count(File) ->
-    {ok, _Names_tid, Net_tid} = pnml_ets:read_pt(File),
-    Fun = fun (A, _E) -> A+1 end,
-    Counts = pnml_ets:scan_elements(Fun, 0, Net_tid),
+    {ok, _Names_tid, _Net_tid} = pnml_ets:read_pt(File),
+    Fun = fun (_E, A) -> A+1 end,
+    Counts = pnml_ets:scan_elements(Fun, 0),
     pnml_ets:cleanup(),
     Counts.
 
@@ -120,11 +120,9 @@ scan_ets_count(File) ->
 % function.
 %
 scan_ets_entries(File) ->
-    {ok, _Names_tid, Net_tid} = pnml_ets:read_pt(File),
-    Fun = fun (A, [E_type, E_num, E_par]) -> 
-                  [{{E_type, E_num}, E_par}|A]
-          end,
-    Entries = pnml_ets:scan_elements(Fun, [], Net_tid),
+    {ok, _Names_tid, _Net_tid} = pnml_ets:read_pt(File),
+    Fun = fun (E, A) -> [E|A] end,
+    Entries = pnml_ets:scan_elements(Fun, []),
     pnml_ets:cleanup(),
     lists:sort(Entries).
 
