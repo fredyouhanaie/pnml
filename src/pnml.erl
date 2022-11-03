@@ -45,6 +45,10 @@
 
 %%--------------------------------------------------------------------
 
+-type read_ret() :: {ok, State::term()} | {error, Reason::term()}.
+
+%%--------------------------------------------------------------------
+
 -callback handle_begin(atom(), term(), term()) -> term().
 -callback handle_end(atom(), term()) -> term().
 -callback handle_text(string(), term()) -> term().
@@ -67,8 +71,7 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec read(string(), atom(), term()) ->
-          {ok, State::term()} | {error, Reason::term()}.
+-spec read(string(), atom(), term()) -> read_ret().
 read(Filename, CB_module, CB_state) ->
     ?LOG_INFO("read: scan started File=~p.", [Filename]),
 

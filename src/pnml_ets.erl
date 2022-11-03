@@ -97,6 +97,10 @@
 
 -type ref_type() :: referencePlace | referenceTransition.
 
+-type read_pt_ret() :: {ok | {error, Reason::term()},
+                        Names_tid::ets:tid(),
+                        Net_tid::ets:tid()}.
+
 %%--------------------------------------------------------------------
 %% @doc Read a PT net and store the details in ETS tables.
 %%
@@ -108,10 +112,7 @@
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec read_pt(string()) ->
-          {ok | {error, Reason::term()},
-           Names_tid::ets:tid(),
-           Net_tid::ets:tid()}.
+-spec read_pt(string()) -> read_pt_ret().
 read_pt(File) ->
     Names_tabid = create_table("names_tid"),
     Net_tabid   = create_table("net_tid"),
