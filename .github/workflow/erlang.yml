@@ -1,0 +1,33 @@
+---
+name: Erlang CI
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: [trunk]
+  pull_request:
+    branches: [trunk]
+
+permissions:
+  contents: read
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        erlang:
+          - 23.3.4.18
+          - 24.3.4.6
+          - 25.1
+          - 25.1.1
+          - 25.1.2
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Compile
+        run: rebar3 compile
+      - name: Run tests
+        run: rebar3 do eunit, ct
