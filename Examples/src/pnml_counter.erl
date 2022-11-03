@@ -21,6 +21,7 @@
 
 -export([handle_begin/3, handle_end/2, handle_text/2]).
 
+-spec start(string()) -> pnml:read_ret().
 start(File) ->
     pnml:read(File, ?MODULE, #{}).
 

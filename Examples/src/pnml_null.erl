@@ -22,6 +22,7 @@
 
 %%--------------------------------------------------------------------
 
+-spec start(string()) -> {ok, State::term()} | {error, Reason::term()}.
 start(File) ->
     pnml:read(File, ?MODULE, null).
 

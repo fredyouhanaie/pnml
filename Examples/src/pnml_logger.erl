@@ -22,6 +22,7 @@
 
 %%--------------------------------------------------------------------
 
+-spec start(string()) -> pnml:read_ret().
 start(File) ->
     logger:set_handler_config(default, formatter, {logger_formatter, #{}}),
     pnml:read(File, ?MODULE, #{}).
@@ -53,7 +54,7 @@ handle_end(Tag, State) ->
 
 %%--------------------------------------------------------------------
 
--spec handle_text(atom(), map()) -> map().
+-spec handle_text(string(), map()) -> map().
 handle_text(Text, State) ->
     Level = maps:get(log_level, State, notice),
     ?LOG(Level, "pnml:T: Text=~p.", [Text]),
