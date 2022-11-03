@@ -33,7 +33,7 @@ cleanup(_) ->
 %%--------------------------------------------------------------------
 
 null_1_test_() ->
-    {setup, fun setup/0, fun cleanup/1,
+    {"null", setup, fun setup/0, fun cleanup/1,
      [{"no file",
        ?_assertMatch({error, _Reason}, pnml_null:start(?Model_nofile))},
       {"tiny file",
@@ -54,7 +54,7 @@ null_1_test_() ->
                         text => 190, transition => 72 } ).
 
 counter_1_test_() ->
-    {setup, fun setup/0, fun cleanup/1,
+    {"counter", setup, fun setup/0, fun cleanup/1,
      [{"no file",
        ?_assertMatch({error, _Reason}, pnml_counter:start(?Model_nofile))},
       {"tiny file",
@@ -66,7 +66,7 @@ counter_1_test_() ->
 %%--------------------------------------------------------------------
 
 logger_1_test_() ->
-    {setup, fun setup/0, fun cleanup/1,
+    {"logger", setup, fun setup/0, fun cleanup/1,
      [{"no file",
        ?_assertMatch({error, _Reason}, pnml_logger:start(?Model_nofile))},
       {"tiny file",
