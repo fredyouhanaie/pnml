@@ -1,4 +1,3 @@
-*.css
-edoc-info
-erlang.png
-*.html
+*
+!.gitignore
+!overview.edoc
