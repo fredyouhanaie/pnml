@@ -687,8 +687,9 @@ scan_elements(Fun, Acc) ->
 %% pattern <pre>{{place, '$1'}, #{initial_marking => '$2'}}</pre> will produce
 %% pairs of places and their initial marking `[[p1, 1], [p2, 5], ...]''
 %%
-%% The function `Fun' should take two args, the accumulator `Acc' and a list of
-%% elements that will correspond to the place holders in the match pattern.
+%% The function `Fun' should take two args, a list of elements that will
+%% correspond to the place holders in the match pattern and the accumulator
+%% `Acc'.
 %%
 %% @end
 %%--------------------------------------------------------------------
