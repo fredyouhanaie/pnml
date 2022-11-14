@@ -65,6 +65,7 @@
 
 -export([read_pt/1, cleanup/0]).
 -export([scan_elements/1, scan_elements/2, scan_elements/3]).
+-export([get_names_tid/0, get_net_tid/0]).
 
 %% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
