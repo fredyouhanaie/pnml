@@ -13,6 +13,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(Model_nofile, "test/no_file.pnml").  %% this file should never exist!
+-define(Model_empty,  "test/ptnet_0.pnml").
 -define(Model_tiny,   "test/ptnet_1.pnml").
 -define(Model_small,  "test/distributeur-01-unfolded-02.pnml").
 
@@ -94,6 +95,9 @@ scan_elements_test_() ->
      [{"tiny file",
        ?_assertMatch({ok, _Names_tid, _Net_tabid},
                      pnml_ets:read_pt(?Model_tiny)) },
+
+      {"empty pnml counts",
+       ?_assertEqual(0, scan_ets_count(?Model_empty)) },
 
       {"tiny file counts",
        ?_assertEqual(4, scan_ets_count(?Model_tiny)) },
