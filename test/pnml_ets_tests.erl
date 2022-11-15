@@ -1,6 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @author Fred Youhanaie <fyrlang@anydata.co.uk>
-%%% @copyright (C) 2021, Fred Youhanaie
+%%% @copyright 2021-2022, Fred Youhanaie
 %%% @doc
 %%%
 %%% Run the EUnit tests for the pnml_ets module.
@@ -40,7 +40,8 @@ cleanup(_) ->
 %%--------------------------------------------------------------------
 
 read_sample_1_test_() ->
-    {setup, fun setup/0, fun cleanup/1,
+    {"file tests",
+     setup, fun setup/0, fun cleanup/1,
      [{"no file",
        ?_assertMatch({{error, _Reason}, _Names_tid, _Net_tid}, pnml_ets:read_pt(?Model_nofile))},
       {"small file",
@@ -69,7 +70,8 @@ read_sample_1_test_() ->
         ]).
 
 read_ets_1_test_() ->
-    {setup, fun setup/0, fun cleanup/1,
+    {"read tests",
+     setup, fun setup/0, fun cleanup/1,
      [{"tiny file",
        ?_assertMatch({ok, _Names_tid, _Net_tabid},
                      pnml_ets:read_pt(?Model_tiny)) },
@@ -91,7 +93,8 @@ read_ets_tiny() ->
 %%--------------------------------------------------------------------
 
 scan_elements_test_() ->
-    {setup, fun setup/0, fun cleanup/1,
+    {"scan tests",
+     setup, fun setup/0, fun cleanup/1,
      [{"tiny file",
        ?_assertMatch({ok, _Names_tid, _Net_tabid},
                      pnml_ets:read_pt(?Model_tiny)) },
@@ -137,7 +140,8 @@ scan_ets_entries(File) ->
 %%--------------------------------------------------------------------
 
 tables_test_() ->
-    {setup,
+    {"ETS table tests",
+     setup,
      fun() -> pnml_ets:create_table("xxx", []) end,
      fun(_) -> ok end,
      fun check_tables/1
@@ -151,7 +155,8 @@ check_tables(Tid) ->
 %%-------------------------------------------------------------------
 
 insert_test_() ->
-    {setup, local, %% local needed for insert access rights
+    {"insert tests",
+     setup, local, %% local needed for insert access rights
      fun() -> pnml_ets:create_table("net_tid", []) end,
      fun(_Tid) -> pnml_ets:cleanup() end,
      fun check_insert/1
@@ -168,7 +173,8 @@ check_insert(Tid) ->
 %%-------------------------------------------------------------------
 
 process_test_() ->
-    {setup, local, %% local needed for insert access rights
+    {"process_* tests",
+     setup, local, %% local needed for insert access rights
      fun() ->
              {pnml_ets:create_table("net_tid", []),
               pnml_ets:create_table("names_tid", [])}
