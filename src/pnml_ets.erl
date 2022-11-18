@@ -68,6 +68,7 @@
 -export([get_names_tid/0, get_net_tid/0]).
 -export([init_marking/0, init_marking/1]).
 -export([get_nets/0]).
+-export([scan_places/0, scan_places/1]).
 
 %% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
@@ -759,5 +760,25 @@ init_marking(Net_num) ->
     F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
     Init_marking = scan_elements({{place, '$1'}, #{initial_marking => '$2', net_num => Net_num}}, F, []),
     pnml_ptmark:remove_zeros(maps:from_list(Init_marking)).
+
+%%--------------------------------------------------------------------
+%% @doc Return a list of all the places for all the nets.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_places() -> list().
+scan_places() ->
+    F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
+    scan_elements({{place, '$1'}, '$2'}, F, []).
+
+%%--------------------------------------------------------------------
+%% @doc Return a list of all the places for a net.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_places(integer()) -> list().
+scan_places(Net_num) ->
+    F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
+    scan_elements({{place, '$1'}, #{net_num => Net_num}}, F, []).
 
 %%--------------------------------------------------------------------
