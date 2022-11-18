@@ -66,11 +66,12 @@
 -export([read_pt/1, cleanup/0]).
 -export([scan_elements/1, scan_elements/2, scan_elements/3]).
 -export([get_names_tid/0, get_net_tid/0]).
+-export([init_marking/0, init_marking/1]).
+-export([get_nets/0]).
 
 %% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
 
--export([init_marking/0, init_marking/1]).
 
 -ifdef(EUNIT).
 -export([get_id_num/1, add_id_ref/2]).
