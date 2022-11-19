@@ -222,3 +222,30 @@ get_init_mark(File) ->
     Marking.
 
 %%-------------------------------------------------------------------
+
+scan_places_test_() ->
+    {"scan places",
+     setup, fun setup/0, fun cleanup/1,
+     [{"empty pnml counts",
+       ?_assertEqual(0, scan_places_count(?Model_empty)) },
+
+      {"tiny file counts",
+       ?_assertEqual(1, scan_places_count(?Model_tiny)) },
+
+      {"small file counts",
+       ?_assertEqual(24, scan_places_count(?Model_small)) }
+
+     ]}.
+
+%%--------------------------------------------------------------------
+
+% Read a model into ETS and return a count of its places.
+%
+scan_places_count(File) ->
+    {ok, _Names_tid, _Net_tid} = pnml_ets:read_pt(File),
+    Fun = fun (_E, A) -> A+1 end,
+    Counts = length(pnml_ets:scan_places()),
+    pnml_ets:cleanup(),
+    Counts.
+
+%%--------------------------------------------------------------------
