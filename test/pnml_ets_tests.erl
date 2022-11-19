@@ -95,11 +95,8 @@ read_ets_tiny() ->
 scan_elements_test_() ->
     {"scan tests",
      setup, fun setup/0, fun cleanup/1,
-     [{"tiny file",
-       ?_assertMatch({ok, _Names_tid, _Net_tabid},
-                     pnml_ets:read_pt(?Model_tiny)) },
 
-      {"empty pnml counts",
+     [{"empty pnml counts",
        ?_assertEqual(0, scan_ets_count(?Model_empty)) },
 
       {"tiny file counts",
