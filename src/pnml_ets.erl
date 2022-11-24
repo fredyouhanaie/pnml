@@ -68,8 +68,8 @@
 -export([get_names_tid/0, get_net_tid/0]).
 -export([init_marking/0, init_marking/1]).
 -export([get_nets/0]).
--export([scan_places/0, scan_transitions/0]).
--export([scan_places/1, scan_transitions/1]).
+-export([scan_places/0, scan_transitions/0, scan_arcs/0]).
+-export([scan_places/1, scan_transitions/1, scan_arcs/1]).
 
 %% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
@@ -818,5 +818,30 @@ scan_transitions() ->
 -spec scan_transitions(integer()) -> [] | [{integer(), map()}].
 scan_transitions(Net_num) ->
     scan_elements(?Scan_patt_net(transition, Net_num), ?Scan_fun, []).
+
+%%--------------------------------------------------------------------
+%% @doc Return a list of all the arcs for all the nets.
+%%
+%% We return a list of `{Num, Map}' tuples for all the arcs in the Nets table.
+%% These will typically be:
+%%
+%% `[{Arc_num, #{net_num => Net_num, inscription => Tokens}}]'
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_arcs() -> [] | [integer()].
+scan_arcs() ->
+    scan_elements(?Scan_patt_all(arc), ?Scan_fun, []).
+
+%%--------------------------------------------------------------------
+%% @doc Return a list of all the arc for a net.
+%%
+%% We return a list of arc numbers.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_arcs(integer()) -> [] | [{integer(), map()}].
+scan_arcs(Net_num) ->
+    scan_elements(?Scan_patt_net(arc, Net_num), ?Scan_fun, []).
 
 %%--------------------------------------------------------------------
