@@ -764,9 +764,14 @@ init_marking(Net_num) ->
 %%--------------------------------------------------------------------
 %% @doc Return a list of all the places for all the nets.
 %%
+%% We return a list of `{Num, Map}' tuples for all the placess in the Nets
+%% table. These will typically be:
+%%
+%% `[{Place_num, #{net_num => Net_num, initial_marking => Tokens}}]'
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec scan_places() -> list().
+-spec scan_places() -> [] | [{integer(), map()}].
 scan_places() ->
     F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
     scan_elements({{place, '$1'}, '$2'}, F, []).
@@ -774,9 +779,11 @@ scan_places() ->
 %%--------------------------------------------------------------------
 %% @doc Return a list of all the places for a net.
 %%
+%% A list of integers is returned. The list may be empty.
+%%
 %% @end
 %%--------------------------------------------------------------------
--spec scan_places(integer()) -> list().
+-spec scan_places(integer()) -> [] | [integer()].
 scan_places(Net_num) ->
     F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
     scan_elements({{place, '$1'}, #{net_num => Net_num}}, F, []).

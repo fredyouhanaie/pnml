@@ -240,7 +240,6 @@ scan_places_test_() ->
 %
 scan_places_count(File) ->
     {ok, _Names_tid, _Net_tid} = pnml_ets:read_pt(File),
-    Fun = fun (_E, A) -> A+1 end,
     Counts = length(pnml_ets:scan_places()),
     pnml_ets:cleanup(),
     Counts.
