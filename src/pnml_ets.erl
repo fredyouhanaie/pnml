@@ -68,7 +68,8 @@
 -export([get_names_tid/0, get_net_tid/0]).
 -export([init_marking/0, init_marking/1]).
 -export([get_nets/0]).
--export([scan_places/0, scan_places/1]).
+-export([scan_places/0, scan_transitions/0]).
+-export([scan_places/1, scan_transitions/1]).
 
 %% The pnml callbacks
 -export([handle_begin/3, handle_end/2, handle_text/2]).
@@ -787,5 +788,32 @@ scan_places() ->
 scan_places(Net_num) ->
     F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
     scan_elements({{place, '$1'}, #{net_num => Net_num}}, F, []).
+
+%%--------------------------------------------------------------------
+%% @doc Return a list of all the transitions for all the nets.
+%%
+%% We return a list of `{Num, Map}' tuples for all the transitions in the Nets
+%% table. These will typically be:
+%%
+%% `[{Trans_num, #{net_num => Net_num}}]'
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_transitions() -> [] | [integer()].
+scan_transitions() ->
+    F = fun ([T, M], Acc) -> [{T,M}|Acc] end,
+    scan_elements({{transition, '$1'}, '$2'}, F, []).
+
+%%--------------------------------------------------------------------
+%% @doc Return a list of all the transitions for a net.
+%%
+%% We return a list of transition numbers.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec scan_transitions(integer()) -> [] | [{integer(), map()}].
+scan_transitions(Net_num) ->
+    F = fun ([T, M], Acc) -> [{T,M}|Acc] end,
+    scan_elements({{transition, '$1'}, #{net_num => Net_num}}, F, []).
 
 %%--------------------------------------------------------------------
