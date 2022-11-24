@@ -763,6 +763,13 @@ init_marking(Net_num) ->
     pnml_ptmark:remove_zeros(maps:from_list(Init_marking)).
 
 %%--------------------------------------------------------------------
+
+-define(Scan_fun, fun ([Num, Map], Acc) -> [{Num, Map}|Acc] end).
+
+-define(Scan_patt_all(Tag),      {{Tag, '$1'}, '$2'}).
+-define(Scan_patt_net(Tag, Net), {{Tag, '$1'}, #{net_num => Net}}).
+
+%%--------------------------------------------------------------------
 %% @doc Return a list of all the places for all the nets.
 %%
 %% We return a list of `{Num, Map}' tuples for all the placess in the Nets
@@ -774,8 +781,7 @@ init_marking(Net_num) ->
 %%--------------------------------------------------------------------
 -spec scan_places() -> [] | [{integer(), map()}].
 scan_places() ->
-    F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
-    scan_elements({{place, '$1'}, '$2'}, F, []).
+    scan_elements(?Scan_patt_all(place), ?Scan_fun, []).
 
 %%--------------------------------------------------------------------
 %% @doc Return a list of all the places for a net.
@@ -786,8 +792,7 @@ scan_places() ->
 %%--------------------------------------------------------------------
 -spec scan_places(integer()) -> [] | [integer()].
 scan_places(Net_num) ->
-    F = fun ([P, M], Acc) -> [{P,M}|Acc] end,
-    scan_elements({{place, '$1'}, #{net_num => Net_num}}, F, []).
+    scan_elements(?Scan_patt_net(place, Net_num), ?Scan_fun, []).
 
 %%--------------------------------------------------------------------
 %% @doc Return a list of all the transitions for all the nets.
@@ -801,8 +806,7 @@ scan_places(Net_num) ->
 %%--------------------------------------------------------------------
 -spec scan_transitions() -> [] | [integer()].
 scan_transitions() ->
-    F = fun ([T, M], Acc) -> [{T,M}|Acc] end,
-    scan_elements({{transition, '$1'}, '$2'}, F, []).
+    scan_elements(?Scan_patt_all(transition), ?Scan_fun, []).
 
 %%--------------------------------------------------------------------
 %% @doc Return a list of all the transitions for a net.
@@ -813,7 +817,6 @@ scan_transitions() ->
 %%--------------------------------------------------------------------
 -spec scan_transitions(integer()) -> [] | [{integer(), map()}].
 scan_transitions(Net_num) ->
-    F = fun ([T, M], Acc) -> [{T,M}|Acc] end,
-    scan_elements({{transition, '$1'}, #{net_num => Net_num}}, F, []).
+    scan_elements(?Scan_patt_net(transition, Net_num), ?Scan_fun, []).
 
 %%--------------------------------------------------------------------
