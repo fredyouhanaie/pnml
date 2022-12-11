@@ -105,6 +105,23 @@
                         Net_tid::ets:tid()}.
 
 %%--------------------------------------------------------------------
+
+-record(handler, {state, cbmodule=none}).
+
+%%--------------------------------------------------------------------
+
+-callback handle_new(Tag::atom(), Id_num::integer()) -> ok.
+
+-define(Call_handler(CB_mod, Tag, Id_num),
+        case CB_mod of
+            none ->
+                ok;
+            _ ->
+                CB_mod:handle_new(Tag, Id_num),
+                ok
+        end).
+
+%%--------------------------------------------------------------------
 %% @doc Read a PT net and store the details in ETS tables.
 %%
 %% We create two tables one for the net elements, and the other for
@@ -120,7 +137,7 @@ read_pt(File) ->
     Names_tabid = create_table("names_tid"),
     Net_tabid   = create_table("net_tid"),
 
-    State0 = {[], 0, 0},
+    State0 = #handler{state={[], 0, 0}},
     case pnml:read(File, ?MODULE, State0) of
         {ok, State0} ->
             {ok, Names_tabid, Net_tabid};
@@ -201,56 +218,56 @@ handle_text(Text, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec h_ets_begin(atom(), map(), h_ets_state()) -> h_ets_state().
-h_ets_begin(pnml, _Attr_map, {[], 0, 0}) ->
+h_ets_begin(pnml, _Attr_map, State=#handler{state={[], 0, 0}}) ->
     ?LOG_DEBUG("h_ets_begin: pnml, Parents=[]."),
-    {[pnml], 0, 0};
+    State#handler{state={[pnml], 0, 0}};
 
-h_ets_begin(net, Attr_map, {[pnml], 0, 0}) ->
+h_ets_begin(net, Attr_map, State=#handler{state={[pnml], 0, 0}}) ->
     ?LOG_DEBUG("h_ets_begin: net, Parents=[pnml]."),
     Id_num = get_id_num(maps:get(id, Attr_map)),
     process_net(Id_num, Attr_map),
-    {[net, pnml], Id_num, 0};
+    State#handler{state={[net, pnml], Id_num, 0}};
 
-h_ets_begin(place, Attr_map, {Parents=[net, pnml], Net_num, 0}) ->
+h_ets_begin(place, Attr_map, State=#handler{state={Parents=[net, pnml], Net_num, 0}}) ->
     ?LOG_DEBUG("h_ets_begin: place, Parents=~p].", [Parents]),
     {place, Place_num} = process_place(Attr_map, Net_num),
-    {[place|Parents], Net_num, Place_num};
+    State#handler{state={[place|Parents], Net_num, Place_num}};
 
-h_ets_begin(transition, Attr_map, {Parents=[net, pnml], Net_num, 0}) ->
+h_ets_begin(transition, Attr_map, State=#handler{state={Parents=[net, pnml], Net_num, 0}}) ->
     ?LOG_DEBUG("h_ets_begin: transition, Parents=~p].", [Parents]),
     {transition, Tran_num} = process_transition(Attr_map, Net_num),
-    {[transition|Parents], Net_num, Tran_num};
+    State#handler{state={[transition|Parents], Net_num, Tran_num}};
 
-h_ets_begin(arc, Attr_map, State={Parents=[net, pnml], Net_num, 0}) ->
+h_ets_begin(arc, Attr_map, State=#handler{state={Parents=[net, pnml], Net_num, 0}}) ->
     ?LOG_DEBUG("h_ets_begin: arc, State=~p].", [State]),
     {arc, Arc_num} = process_arc(Attr_map, Net_num),
-    {[arc|Parents], Net_num, Arc_num};
+    State#handler{state={[arc|Parents], Net_num, Arc_num}};
 
-h_ets_begin(initialMarking, _Attr_map, State={Parents=[place|_], Net_num, Place_num}) ->
+h_ets_begin(initialMarking, _Attr_map, State=#handler{state={Parents=[place|_], Net_num, Place_num}}) ->
     ?LOG_DEBUG("h_ets_begin: initialMarking, State=~p].", [State]),
-    {[initialMarking|Parents], Net_num, Place_num};
+    State#handler{state={[initialMarking|Parents], Net_num, Place_num}};
 
-h_ets_begin(inscription, _Attr_map, State={Parents=[arc|_], Net_num, Arc_num}) ->
+h_ets_begin(inscription, _Attr_map, State=#handler{state={Parents=[arc|_], Net_num, Arc_num}}) ->
     ?LOG_DEBUG("h_ets_begin: inscription, State=~p].", [State]),
-    {[inscription|Parents], Net_num, Arc_num};
+    State#handler{state={[inscription|Parents], Net_num, Arc_num}};
 
-h_ets_begin(referencePlace, Attr_map, State={[net, pnml], Net_num, 0}) ->
+h_ets_begin(referencePlace, Attr_map, State=#handler{state={[net, pnml], Net_num, 0}}) ->
     ?LOG_DEBUG("h_ets_begin: referencePlace, State=~p].", [State]),
     referencePlace = process_reference(referencePlace, Attr_map),
-    {[referencePlace, net, pnml], Net_num, 0};
+    State#handler{state={[referencePlace, net, pnml], Net_num, 0}};
 
-h_ets_begin(referenceTransition, Attr_map, State={[net, pnml], Net_num, 0}) ->
+h_ets_begin(referenceTransition, Attr_map, State=#handler{state={[net, pnml], Net_num, 0}}) ->
     ?LOG_DEBUG("h_ets_begin: referenceTransition, State=~p].", [State]),
     referenceTransition = process_reference(referenceTransition, Attr_map),
-    {[referenceTransition, net, pnml], Net_num, 0};
+    State#handler{state={[referenceTransition, net, pnml], Net_num, 0}};
 
-h_ets_begin(text, _Attr_map, State={Parents=[initialMarking|_], Net_num, Place_num}) ->
+h_ets_begin(text, _Attr_map, State=#handler{state={Parents=[initialMarking|_], Net_num, Place_num}}) ->
     ?LOG_DEBUG("h_ets_begin: initialMarking, State=~p].", [State]),
-    {[text|Parents], Net_num, Place_num};
+    State#handler{state={[text|Parents], Net_num, Place_num}};
 
-h_ets_begin(text, _Attr_map, State={Parents=[inscription|_], Net_num, Arc_num}) ->
+h_ets_begin(text, _Attr_map, State=#handler{state={Parents=[inscription|_], Net_num, Arc_num}}) ->
     ?LOG_DEBUG("h_ets_begin: inscription, State=~p].", [State]),
-    {[text|Parents], Net_num, Arc_num};
+    State#handler{state={[text|Parents], Net_num, Arc_num}};
 
 h_ets_begin(Tag, _Attr_map, State) ->
     ?LOG_DEBUG("h_ets_begin: tag ignored Tag=~p, State=~p.", [Tag, State]),
@@ -271,41 +288,45 @@ h_ets_begin(Tag, _Attr_map, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec h_ets_end(atom(), h_ets_state()) -> h_ets_state().
-h_ets_end(pnml, State={[pnml], 0, 0}) ->
+h_ets_end(pnml, State=#handler{state={[pnml], 0, 0}}) ->
     ?LOG_DEBUG("h_ets_end: pnml, State=~p.", [State]),
-    {[], 0, 0};
+    State#handler{state={[], 0, 0}};
 
-h_ets_end(net, State={[net|Rest], _Net_num, 0}) ->
+h_ets_end(net, State=#handler{state={[net|Rest], Net_num, 0}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: net, State=~p.", [State]),
-    {Rest, 0, 0};
+    ?Call_handler(CB_mod, net, Net_num),
+    State#handler{state={Rest, 0, 0}};
 
-h_ets_end(place, State={[place|Rest], Net_num, _Place_num}) ->
+h_ets_end(place, State=#handler{state={[place|Rest], Net_num, Place_num}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: place, State=~p.", [State]),
-    {Rest, Net_num, 0};
+    ?Call_handler(CB_mod, place, Place_num),
+    State#handler{state={Rest, Net_num, 0}};
 
-h_ets_end(transition, State={[transition|Rest], Net_num, _Tran_num}) ->
+h_ets_end(transition, State=#handler{state={[transition|Rest], Net_num, Tran_num}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: transition, State=~p.", [State]),
-    {Rest, Net_num, 0};
+    ?Call_handler(CB_mod, transition, Tran_num),
+    State#handler{state={Rest, Net_num, 0}};
 
-h_ets_end(arc, State={[arc|Rest], Net_num, _Arc_num}) ->
+h_ets_end(arc, State=#handler{state={[arc|Rest], Net_num, Arc_num}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: arc, State=~p.", [State]),
-    {Rest, Net_num, 0};
+    ?Call_handler(CB_mod, arc, Arc_num),
+    State#handler{state={Rest, Net_num, 0}};
 
-h_ets_end(initialMarking, State={[initialMarking|Rest], Net_num, Place_num}) ->
+h_ets_end(initialMarking, State=#handler{state={[initialMarking|Rest], Net_num, Place_num}}) ->
     ?LOG_DEBUG("h_ets_end: initialMarking, State=~p.", [State]),
-    {Rest, Net_num, Place_num};
+    State#handler{state={Rest, Net_num, Place_num}};
 
-h_ets_end(inscription, State={[inscription|Rest], Net_num, Arc_num}) ->
+h_ets_end(inscription, State=#handler{state={[inscription|Rest], Net_num, Arc_num}}) ->
     ?LOG_DEBUG("h_ets_end: inscription, State=~p.", [State]),
-    {Rest, Net_num, Arc_num};
+    State#handler{state={Rest, Net_num, Arc_num}};
 
-h_ets_end(text, State={[text,initialMarking|Rest], Net_num, Place_num}) ->
+h_ets_end(text, State=#handler{state={[text,initialMarking|Rest], Net_num, Place_num}}) ->
     ?LOG_DEBUG("h_ets_end: text, State=~p.", [State]),
-    {[initialMarking|Rest], Net_num, Place_num};
+    State#handler{state={[initialMarking|Rest], Net_num, Place_num}};
 
-h_ets_end(text, State={[text,inscription|Rest], Net_num, Arc_num}) ->
+h_ets_end(text, State=#handler{state={[text,inscription|Rest], Net_num, Arc_num}}) ->
     ?LOG_DEBUG("h_ets_end: text, State=~p.", [State]),
-    {[inscription|Rest], Net_num, Arc_num};
+    State#handler{state={[inscription|Rest], Net_num, Arc_num}};
 
 h_ets_end(text, State) ->
     ?LOG_DEBUG("h_ets_end: text ignored, State=~p.", [State]),
@@ -330,11 +351,11 @@ h_ets_end(Tag, State) ->
 %% @end
 %%--------------------------------------------------------------------
 -spec h_ets_text(string(), h_ets_state()) -> h_ets_state().
-h_ets_text(Text, State={[text, initialMarking | _ ], _Net_num, Place_num}) ->
+h_ets_text(Text, State=#handler{state={[text, initialMarking | _ ], _Net_num, Place_num}}) ->
     ok = process_initialMarking(Text, Place_num),
     State;
 
-h_ets_text(Text, State={[text, inscription | _ ], _Net_num, Arc_num}) ->
+h_ets_text(Text, State=#handler{state={[text, inscription | _ ], _Net_num, Arc_num}}) ->
     ok = process_inscription(Text, Arc_num),
     State;
 
