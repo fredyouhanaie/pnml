@@ -106,7 +106,20 @@
 
 %%--------------------------------------------------------------------
 
--record(handler, {state, cbmodule}).
+-record(handler, {state, cbmodule=none}).
+
+%%--------------------------------------------------------------------
+
+-callback handle_new(Tag::atom(), Id_num::integer()) -> ok.
+
+-define(Call_handler(CB_mod, Tag, Id_num),
+        case CB_mod of
+            none ->
+                ok;
+            _ ->
+                CB_mod:handle_new(Tag, Id_num),
+                ok
+        end).
 
 %%--------------------------------------------------------------------
 %% @doc Read a PT net and store the details in ETS tables.
@@ -279,20 +292,24 @@ h_ets_end(pnml, State=#handler{state={[pnml], 0, 0}}) ->
     ?LOG_DEBUG("h_ets_end: pnml, State=~p.", [State]),
     State#handler{state={[], 0, 0}};
 
-h_ets_end(net, State=#handler{state={[net|Rest], _Net_num, 0}}) ->
+h_ets_end(net, State=#handler{state={[net|Rest], Net_num, 0}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: net, State=~p.", [State]),
+    ?Call_handler(CB_mod, net, Net_num),
     State#handler{state={Rest, 0, 0}};
 
-h_ets_end(place, State=#handler{state={[place|Rest], Net_num, _Place_num}}) ->
+h_ets_end(place, State=#handler{state={[place|Rest], Net_num, Place_num}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: place, State=~p.", [State]),
+    ?Call_handler(CB_mod, place, Place_num),
     State#handler{state={Rest, Net_num, 0}};
 
-h_ets_end(transition, State=#handler{state={[transition|Rest], Net_num, _Tran_num}}) ->
+h_ets_end(transition, State=#handler{state={[transition|Rest], Net_num, Tran_num}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: transition, State=~p.", [State]),
+    ?Call_handler(CB_mod, transition, Tran_num),
     State#handler{state={Rest, Net_num, 0}};
 
-h_ets_end(arc, State=#handler{state={[arc|Rest], Net_num, _Arc_num}}) ->
+h_ets_end(arc, State=#handler{state={[arc|Rest], Net_num, Arc_num}, cbmodule=CB_mod}) ->
     ?LOG_DEBUG("h_ets_end: arc, State=~p.", [State]),
+    ?Call_handler(CB_mod, arc, Arc_num),
     State#handler{state={Rest, Net_num, 0}};
 
 h_ets_end(initialMarking, State=#handler{state={[initialMarking|Rest], Net_num, Place_num}}) ->
