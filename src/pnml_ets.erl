@@ -63,7 +63,7 @@
 
 -behaviour(pnml).
 
--export([read_pt/1, cleanup/0]).
+-export([read_pt/1, read_pt/2, cleanup/0]).
 -export([scan_elements/1, scan_elements/2, scan_elements/3]).
 -export([get_names_tid/0, get_net_tid/0]).
 -export([init_marking/0, init_marking/1]).
@@ -106,20 +106,29 @@
 
 %%--------------------------------------------------------------------
 
--record(handler, {state, cbmodule=none}).
+-record(handler, {state, cbfunction=none}).
 
 %%--------------------------------------------------------------------
 
--callback handle_new(Tag::atom(), Id_num::integer()) -> ok.
-
--define(Call_handler(CB_mod, Tag, Id_num),
-        case CB_mod of
+-define(Call_handler(CB_func, Tag, Id_num),
+        case CB_func of
             none ->
                 ok;
             _ ->
-                CB_mod:handle_new(Tag, Id_num),
+                erlang:apply(CB_func, [Tag, Id_num]),
                 ok
         end).
+
+%%--------------------------------------------------------------------
+%% @doc Read a PT net and store the details in ETS tables.
+%%
+%% See `read_pt/2' for details.
+%%
+%% @end
+%%--------------------------------------------------------------------
+-spec read_pt(string()) -> read_pt_ret().
+read_pt(File) ->
+    read_pt(File, none).
 
 %%--------------------------------------------------------------------
 %% @doc Read a PT net and store the details in ETS tables.
@@ -127,17 +136,24 @@
 %% We create two tables one for the net elements, and the other for
 %% the element names and their corresponding unique numbers.
 %%
+%% For the main PNML elements, i.e. `net', `place', `transition' and `arc', we
+%% call the supplied callback function `CB_function', once the end element has
+%% been detected. The function will be called with 2 arguments, `Tag' and
+%% `Id_num'.
+%%
+%% The callback will be skipped if `CB_function' is the atom `none'.
+%%
 %% Whether succussful or not, the ETS table identifiers are
 %% returned to the caller.
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec read_pt(string()) -> read_pt_ret().
-read_pt(File) ->
+-spec read_pt(string(), function()) -> read_pt_ret().
+read_pt(File, CB_function) ->
     Names_tabid = create_table("names_tid"),
     Net_tabid   = create_table("net_tid"),
 
-    State0 = #handler{state={[], 0, 0}},
+    State0 = #handler{state={[], 0, 0}, cbfunction=CB_function},
     case pnml:read(File, ?MODULE, State0) of
         {ok, State0} ->
             {ok, Names_tabid, Net_tabid};
@@ -292,24 +308,24 @@ h_ets_end(pnml, State=#handler{state={[pnml], 0, 0}}) ->
     ?LOG_DEBUG("h_ets_end: pnml, State=~p.", [State]),
     State#handler{state={[], 0, 0}};
 
-h_ets_end(net, State=#handler{state={[net|Rest], Net_num, 0}, cbmodule=CB_mod}) ->
+h_ets_end(net, State=#handler{state={[net|Rest], Net_num, 0}, cbfunction=CB_func}) ->
     ?LOG_DEBUG("h_ets_end: net, State=~p.", [State]),
-    ?Call_handler(CB_mod, net, Net_num),
+    ?Call_handler(CB_func, net, Net_num),
     State#handler{state={Rest, 0, 0}};
 
-h_ets_end(place, State=#handler{state={[place|Rest], Net_num, Place_num}, cbmodule=CB_mod}) ->
+h_ets_end(place, State=#handler{state={[place|Rest], Net_num, Place_num}, cbfunction=CB_func}) ->
     ?LOG_DEBUG("h_ets_end: place, State=~p.", [State]),
-    ?Call_handler(CB_mod, place, Place_num),
+    ?Call_handler(CB_func, place, Place_num),
     State#handler{state={Rest, Net_num, 0}};
 
-h_ets_end(transition, State=#handler{state={[transition|Rest], Net_num, Tran_num}, cbmodule=CB_mod}) ->
+h_ets_end(transition, State=#handler{state={[transition|Rest], Net_num, Tran_num}, cbfunction=CB_func}) ->
     ?LOG_DEBUG("h_ets_end: transition, State=~p.", [State]),
-    ?Call_handler(CB_mod, transition, Tran_num),
+    ?Call_handler(CB_func, transition, Tran_num),
     State#handler{state={Rest, Net_num, 0}};
 
-h_ets_end(arc, State=#handler{state={[arc|Rest], Net_num, Arc_num}, cbmodule=CB_mod}) ->
+h_ets_end(arc, State=#handler{state={[arc|Rest], Net_num, Arc_num}, cbfunction=CB_func}) ->
     ?LOG_DEBUG("h_ets_end: arc, State=~p.", [State]),
-    ?Call_handler(CB_mod, arc, Arc_num),
+    ?Call_handler(CB_func, arc, Arc_num),
     State#handler{state={Rest, Net_num, 0}};
 
 h_ets_end(initialMarking, State=#handler{state={[initialMarking|Rest], Net_num, Place_num}}) ->

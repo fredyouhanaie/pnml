@@ -297,3 +297,31 @@ scan_arcs_count(File) ->
     Counts.
 
 %%--------------------------------------------------------------------
+
+-define(CB_table, pnml_ets_cb).
+-define(CB_func, fun (Tag, Id_num) ->
+                         ets:update_counter(?CB_table, Tag, 1, {Tag,0})
+                 end).
+
+read_cb_test_() ->
+    {"read_pt with callback",
+     setup, fun setup/0, fun cleanup/1,
+     [{"empty pnml counts",
+       ?_assertEqual([], counts_via_read_cb(?Model_empty)) },
+      {"tiny pnml counts",
+       ?_assertEqual([{arc,1},{net,1},{place,1},{transition,1}],
+                     counts_via_read_cb(?Model_tiny)) },
+      {"small pnml counts",
+       ?_assertEqual([{arc,440},{net,1},{place,24},{transition,72}],
+                     counts_via_read_cb(?Model_small)) }
+     ]}.
+
+counts_via_read_cb(File) ->
+    ?CB_table = ets:new(?CB_table, [named_table]),
+    {ok, _Names_tid, _Net_tid} = pnml_ets:read_pt(File, ?CB_func),
+    Counts = lists:sort(ets:tab2list(?CB_table)),
+    ets:delete(?CB_table),
+    pnml_ets:cleanup(),
+    Counts.
+
+%%--------------------------------------------------------------------
