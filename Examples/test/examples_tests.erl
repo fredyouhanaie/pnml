@@ -33,7 +33,8 @@ cleanup(_) ->
 %%--------------------------------------------------------------------
 
 null_1_test_() ->
-    {"null", setup, fun setup/0, fun cleanup/1,
+    {"null",
+     setup, fun setup/0, fun cleanup/1,
      [{"no file",
        ?_assertMatch({error, _Reason}, pnml_null:start(?Model_nofile))},
       {"tiny file",
@@ -54,7 +55,8 @@ null_1_test_() ->
                         text => 190, transition => 72 } ).
 
 counter_1_test_() ->
-    {"counter", setup, fun setup/0, fun cleanup/1,
+    {"counter",
+     setup, fun setup/0, fun cleanup/1,
      [{"no file",
        ?_assertMatch({error, _Reason}, pnml_counter:start(?Model_nofile))},
       {"tiny file",
@@ -66,13 +68,29 @@ counter_1_test_() ->
 %%--------------------------------------------------------------------
 
 logger_1_test_() ->
-    {"logger", setup, fun setup/0, fun cleanup/1,
+    {"logger",
+     setup, fun setup/0, fun cleanup/1,
      [{"no file",
        ?_assertMatch({error, _Reason}, pnml_logger:start(?Model_nofile))},
       {"tiny file",
        ?_assertEqual({ok, #{log_level=>notice}}, pnml_logger:start(?Model_tiny))},
       {"small file",
        ?_assertEqual({ok, #{log_level=>notice}}, pnml_logger:start(?Model_small))}
+     ]}.
+
+%%--------------------------------------------------------------------
+
+counter_cb_test_() ->
+    {"counter via ets callback",
+     setup, fun setup/0, fun cleanup/1,
+     [{"no file",
+       ?_assertMatch({error, _Reason}, pnml_ets_counter:get_counts(?Model_nofile))},
+      {"tiny file",
+       ?_assertEqual([{arc,1},{net,1},{place,1},{transition,1}],
+                     pnml_ets_counter:get_counts(?Model_tiny))},
+      {"small file",
+       ?_assertEqual([{arc,440},{net,1},{place,24},{transition,72}],
+                     pnml_ets_counter:get_counts(?Model_small))}
      ]}.
 
 %%--------------------------------------------------------------------
