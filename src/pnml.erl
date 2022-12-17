@@ -49,9 +49,9 @@
 
 %%--------------------------------------------------------------------
 
--callback handle_begin(atom(), term(), term()) -> term().
--callback handle_end(atom(), term()) -> term().
--callback handle_text(string(), term()) -> term().
+-callback handle_begin(Tag::atom(), Attr::term(), State::term()) -> Result::term().
+-callback handle_end(Tag::atom(), State::term()) -> Result::term().
+-callback handle_text(Text::string(), State::term()) -> Result::term().
 
 %%--------------------------------------------------------------------
 %% @doc Read in a valid XML file and process its elements using the supplied
@@ -98,12 +98,24 @@ read(Filename, CB_module, CB_state) ->
 %% We basically handle all the tag starts, ends and character contents, and
 %% ignore the rest.
 %%
-%% The SAX user state is passed to the `handler_caller' as is, and the result is
-%% returned to the SAX parser.
+%% With all callback handlers, `handle_begin', `handle_end' and `handle_text',
+%% we supply the current state as the last argument to the handler, and use the
+%% returned result as the new state.
+%%
+%% For the `startElement' event we call `handle_begin/3' with the element's
+%% `Tag' as an atom, and `Attributes', as provided by `xmerl_sax_parser' event
+%% data. The handler can use the function `attr_map/1` to extract a map of
+%% `#{Key => Value}' pairs from `Attributes'.
+%%
+%% For the `endElement' event we call `handle_end/2' with the `Tag' and the
+%% current state.
+%%
+%% For the `characters' event we call `handle_text/2' with the element text and
+%% the current state.
 %%
 %% It should be noted that `event_cb/3' does not understand, or care about, PNML
 %% files. At this level, this is very much plain XML processing. All the PNML
-%% related processing is carried out in the callback function.
+%% related processing is carried out in the callback functions.
 %%
 %% @end
 %%--------------------------------------------------------------------
