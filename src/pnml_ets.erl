@@ -148,7 +148,7 @@ read_pt(File) ->
 %%
 %% @end
 %%--------------------------------------------------------------------
--spec read_pt(string(), function()) -> read_pt_ret().
+-spec read_pt(string(), function()|none) -> read_pt_ret().
 read_pt(File, CB_function) ->
     Names_tabid = create_table("names_tid"),
     Net_tabid   = create_table("net_tid"),
